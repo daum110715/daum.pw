@@ -121,16 +121,78 @@ const HorizontalScroll = {
 };
 
 /* ========================================
-   Signature Rotator
+   Signature Rotator (typewriter)
    ======================================== */
 
 const Signature = {
-  init() {
-    const el = document.getElementById('heroLine1');
-    if (!el || !window.signatures?.length) return;
+  INTERVAL: 8000,
+  TYPE_SPEED: 38,
+  ERASE_SPEED: 18,
+  PAUSE_AFTER_TYPE: 2200,
+  PAUSE_AFTER_ERASE: 300,
 
-    const sig = window.signatures[Math.floor(Math.random() * window.signatures.length)];
-    renderLines(el, sig.line1 || '', sig.line2 || '');
+  _timer: null,
+  _sigs: [],
+  _idx: 0,
+  _el: null,
+  _abortCtrl: null,
+
+  init() {
+    this._el = document.getElementById('heroLine1');
+    if (!this._el || !window.signatures?.length) return;
+    this._sigs = window.signatures;
+    this._idx = Math.floor(Math.random() * this._sigs.length);
+    this._el.textContent = '';
+    this._el.classList.add('typing');
+    this._run();
+  },
+
+  _current() {
+    const s = this._sigs[this._idx];
+    return s.line1 + (s.line2 ? '\n' + s.line2 : '');
+  },
+
+  async _run() {
+    while (true) {
+      const text = this._current();
+      await this._type(text);
+      await this._wait(this.PAUSE_AFTER_TYPE);
+      await this._erase(text.length);
+      await this._wait(this.PAUSE_AFTER_ERASE);
+      this._idx = (this._idx + 1) % this._sigs.length;
+    }
+  },
+
+  _wait(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  },
+
+  _type(text) {
+    return new Promise(r => {
+      let i = 0;
+      const tick = () => {
+        if (i > text.length) { r(); return; }
+        const chunk = text.slice(0, i);
+        this._el.innerHTML = chunk.replace(/\n/g, '<br>');
+        i++;
+        setTimeout(tick, this.TYPE_SPEED + (Math.random() * 18 | 0));
+      };
+      tick();
+    });
+  },
+
+  _erase(length) {
+    return new Promise(r => {
+      let i = length;
+      const tick = () => {
+        if (i < 0) { r(); return; }
+        const text = this._current().slice(0, i);
+        this._el.innerHTML = text.replace(/\n/g, '<br>');
+        i--;
+        setTimeout(tick, this.ERASE_SPEED);
+      };
+      tick();
+    });
   }
 };
 

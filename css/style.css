@@ -24,6 +24,9 @@
   --accent: #F5B842;
   --accent-soft: rgba(245, 184, 66, 0.12);
   --accent-mid: rgba(245, 184, 66, 0.22);
+  --accent-vivid: #fce38a;
+  --accent-bar-mid: rgba(245, 184, 66, 0.5);
+  --shimmer-color: rgba(255, 245, 200, 0.65);
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   --shadow-hover: 0 8px 40px rgba(0, 0, 0, 0.4);
 }
@@ -38,6 +41,9 @@
   --accent: #EF9F27;
   --accent-soft: rgba(239, 159, 39, 0.1);
   --accent-mid: rgba(239, 159, 39, 0.2);
+  --accent-vivid: #c97d10;
+  --accent-bar-mid: rgba(239, 159, 39, 0.55);
+  --shimmer-color: rgba(255, 255, 255, 0.75);
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   --shadow-hover: 0 8px 40px rgba(0, 0, 0, 0.12);
 }
@@ -372,7 +378,7 @@ button {
 .hero-separator {
   width: 100px;
   height: 4px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-mid), transparent);
+  background: linear-gradient(90deg, var(--accent), var(--accent-bar-mid), transparent);
   margin: 24px 0;
   border-radius: 4px;
   position: relative;
@@ -386,7 +392,7 @@ button {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  background: linear-gradient(90deg, transparent, var(--shimmer-color), transparent);
   animation: shimmer 3s ease-in-out infinite;
 }
 
@@ -474,6 +480,15 @@ button {
   padding-left: 16px;
   border-left: 3px solid var(--accent-mid);
   margin-bottom: 32px;
+  min-height: 3.4em;
+}
+
+.hero-desc.typing::after {
+  content: '|';
+  color: var(--accent);
+  opacity: 0.8;
+  animation: blink 0.7s step-end infinite;
+  margin-left: 1px;
 }
 
 .hero-social {
