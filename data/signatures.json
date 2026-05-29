@@ -1,0 +1,17 @@
+[
+  { "line1": "Ctrl + Shift + T", "line2": "恢复刚关掉的浏览器标签页" },
+  { "line1": "Chrome 地址栏输入", "line2": "data:text/html,<html contenteditable> 临时记事本" },
+  { "line1": "Git 提交写错了", "line2": "git commit --amend 直接改，--no-edit 不动消息" },
+  { "line1": "typeof NaN === 'number'", "line2": "JavaScript 的温柔陷阱" },
+  { "line1": "VS Code 禅模式", "line2": "Ctrl + K 松手再按 Z，世界安静了" },
+  { "line1": "DevTools 控制台输入 $0", "line2": "直接拿到你当前选中的 DOM 元素" },
+  { "line1": "HTTP 418", "line2": "I'm a teapot，RFC 官方认证的彩蛋" },
+  { "line1": "Markdown 图片居中", "line2": "<div align=center> 比找语法快" },
+  { "line1": "按 F2 重命名", "line2": "比右键快十倍，资源管理器通用" },
+  { "line1": "console.table(data)", "line2": "对象数组秒变好看表格" },
+  { "line1": "URL 里的 # 哈希", "line2": "不会发送到服务器，纯前端随便用" },
+  { "line1": "Win + V", "line2": "Windows 剪贴板历史，很多人不知道" },
+  { "line1": "网页图片右键", "line2": "在新标签页打开图片 = 拿原图链接" },
+  { "line1": "CSS 的 :empty", "line2": "选中没有任何内容的元素，省一个 class" },
+  { "line1": "node -p '1+1'", "line2": "比打开浏览器控制台还快" }
+]
