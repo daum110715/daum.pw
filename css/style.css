@@ -130,7 +130,7 @@ button {
   position: fixed;
   inset: 0;
   background: var(--bg);
-  z-index: -1;
+  z-index: -3;
   transition: background 0.4s ease;
 }
 
@@ -139,22 +139,12 @@ button {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 50% at 10% 0%, var(--accent-soft) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 40% at 90% 100%, var(--accent-soft) 0%, transparent 50%);
-  opacity: 0.6;
-  z-index: -1;
+    radial-gradient(ellipse 110% 70% at 20% 0%,   var(--accent-soft) 0%, transparent 55%),
+    radial-gradient(ellipse 80%  60% at 80% 100%,  rgba(13, 148, 136, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse 60%  50% at 55% 50%,   rgba(109, 40, 217, 0.07) 0%, transparent 55%);
+  opacity: 1;
+  z-index: -3;
   transition: opacity 0.4s ease;
-}
-
-.bg::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 28px 28px;
-  opacity: 0.5;
-  z-index: -1;
-  pointer-events: none;
 }
 
 /* ========================================
@@ -164,7 +154,7 @@ button {
 .bg-blobs {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   pointer-events: none;
   overflow: hidden;
 }
@@ -172,36 +162,60 @@ button {
 .bg-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.6;
+  filter: blur(90px);
 }
 
 .bg-blob-1 {
-  width: 500px;
-  height: 500px;
-  top: -150px;
-  right: -100px;
+  width: 700px;
+  height: 700px;
+  top: -200px;
+  right: -120px;
   background: linear-gradient(135deg, var(--accent), var(--accent-mid));
+  opacity: 0.55;
   animation: blobFloat1 25s ease-in-out infinite;
 }
 
 .bg-blob-2 {
-  width: 400px;
-  height: 400px;
-  bottom: -100px;
-  left: 5%;
+  width: 600px;
+  height: 600px;
+  bottom: -150px;
+  left: 2%;
   background: linear-gradient(135deg, #0d9488, #0f766e);
+  opacity: 0.45;
   animation: blobFloat2 30s ease-in-out infinite;
 }
 
 .bg-blob-3 {
-  width: 300px;
-  height: 300px;
-  top: 40%;
-  left: 55%;
+  width: 450px;
+  height: 450px;
+  top: 35%;
+  left: 50%;
   background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  opacity: 0.4;
   animation: blobFloat3 20s ease-in-out infinite;
 }
+
+.bg-blob-4 {
+  width: 400px;
+  height: 400px;
+  top: 5%;
+  left: -80px;
+  background: linear-gradient(135deg, #e11d48, #be123c);
+  opacity: 0.28;
+  animation: blobFloat4 22s ease-in-out infinite;
+}
+
+.bg-blob-5 {
+  width: 350px;
+  height: 350px;
+  bottom: 15%;
+  right: -60px;
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  opacity: 0.3;
+  animation: blobFloat5 28s ease-in-out infinite;
+}
+
+[data-theme="light"] .bg-blob { opacity: 0.18 !important; }
 
 @keyframes blobFloat1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -222,6 +236,51 @@ button {
   20% { transform: translate(-50px, -70px) scale(0.9); }
   45% { transform: translate(60px, 40px) scale(1.2); }
   70% { transform: translate(-30px, 50px) scale(0.95); }
+}
+
+@keyframes blobFloat4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(70px, 80px) scale(1.1); }
+  66% { transform: translate(-40px, 30px) scale(0.9); }
+}
+
+@keyframes blobFloat5 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-60px, -40px) scale(1.1); }
+  70% { transform: translate(40px, 60px) scale(0.9); }
+}
+
+/* ========================================
+   Grain Overlay
+   ======================================== */
+
+.grain-filter {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.grain {
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  filter: url(#grain-noise);
+  opacity: 0.075;
+  pointer-events: none;
+  z-index: -1;
+  animation: grainMove 0.8s steps(4) infinite;
+}
+
+[data-theme="light"] .grain { opacity: 0.045; }
+
+@keyframes grainMove {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-4%, -3%); }
+  50%  { transform: translate(3%, 4%); }
+  75%  { transform: translate(-3%, 3%); }
 }
 
 /* ========================================
@@ -913,6 +972,8 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+
+  .grain { animation: none; opacity: 0.05; }
 }
 
 /* ========================================
