@@ -57,6 +57,8 @@ const renderLines = (el, line1 = '', line2 = '') => {
 
 const BlobBackground = {
   COUNT: 5,
+  COLS: 3,
+  ROWS: 2,
   PALETTE: [
     ['#F5B842', '#E8723A'],
     ['#0d9488', '#0891b2'],
@@ -72,22 +74,38 @@ const BlobBackground = {
     const container = document.querySelector('.bg-blobs');
     if (!container) return;
 
-    const colors = [...this.PALETTE].sort(() => Math.random() - 0.5).slice(0, this.COUNT);
+    const colors = [...this.PALETTE].sort(() => Math.random() - 0.5);
 
-    colors.forEach(([c1, c2]) => {
+    // 把屏幕划成 COLS×ROWS 格，随机取 COUNT 个格，保证分散
+    const cells = Array.from({ length: this.COLS * this.ROWS }, (_, i) => ({
+      col: i % this.COLS,
+      row: Math.floor(i / this.COLS),
+    })).sort(() => Math.random() - 0.5).slice(0, this.COUNT);
+
+    const cellW = 100 / this.COLS;
+    const cellH = 100 / this.ROWS;
+
+    cells.forEach(({ col, row }, i) => {
+      const [c1, c2] = colors[i];
       const el = document.createElement('div');
       el.className = 'bg-blob';
+
       const size    = (400 + Math.random() * 350) | 0;
-      const x       = ((Math.random() * 110) - 15) | 0;
-      const y       = ((Math.random() * 110) - 15) | 0;
+      // 圆心在格内随机（留 15% 边距避免太靠边）
+      const cx      = col * cellW + (0.15 + Math.random() * 0.7) * cellW;
+      const cy      = row * cellH + (0.15 + Math.random() * 0.7) * cellH;
       const angle   = (Math.random() * 360) | 0;
       const opacity = (0.3 + Math.random() * 0.25).toFixed(2);
       const dur     = (18 + Math.random() * 18).toFixed(1);
       const delay   = (-(Math.random() * parseFloat(dur))).toFixed(1);
+      const half    = (size / 2) | 0;
+
       el.style.cssText =
-        `width:${size}px;height:${size}px;left:${x}%;top:${y}%;` +
+        `width:${size}px;height:${size}px;` +
+        `left:calc(${cx.toFixed(2)}% - ${half}px);top:calc(${cy.toFixed(2)}% - ${half}px);` +
         `background:linear-gradient(${angle}deg,${c1},${c2});` +
         `opacity:${opacity};animation-duration:${dur}s;animation-delay:${delay}s;`;
+
       container.appendChild(el);
     });
   }
