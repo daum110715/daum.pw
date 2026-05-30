@@ -112,6 +112,62 @@ const BlobBackground = {
 };
 
 /* ========================================
+   Mouse Interaction (glow + parallax)
+   ======================================== */
+
+const MouseInteraction = {
+  LERP: 0.07,
+  DEPTHS: [50, 30, 45, 20, 38], // px, per blob depth layer
+
+  init() {
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+
+    const root = document.documentElement;
+    const blobContainer = document.querySelector('.bg-blobs');
+
+    const glow = document.createElement('div');
+    glow.className = 'mouse-glow';
+    glow.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(glow);
+
+    let mx = window.innerWidth / 2;
+    let my = window.innerHeight / 2;
+    let tx = mx, ty = my;
+    let rafId = null;
+
+    const update = () => {
+      const dx = tx - mx, dy = ty - my;
+      if (Math.abs(dx) < 0.15 && Math.abs(dy) < 0.15) { rafId = null; return; }
+
+      mx += dx * this.LERP;
+      my += dy * this.LERP;
+
+      root.style.setProperty('--mx', mx.toFixed(1) + 'px');
+      root.style.setProperty('--my', my.toFixed(1) + 'px');
+
+      if (blobContainer) {
+        const cx = mx / window.innerWidth  - 0.5; // -0.5 ~ 0.5
+        const cy = my / window.innerHeight - 0.5;
+        blobContainer.querySelectorAll('.bg-blob').forEach((blob, i) => {
+          const d = this.DEPTHS[i % this.DEPTHS.length];
+          blob.style.translate = `${(cx * d).toFixed(1)}px ${(cy * d * 0.7).toFixed(1)}px`;
+        });
+      }
+
+      rafId = requestAnimationFrame(update);
+    };
+
+    document.addEventListener('mousemove', (e) => {
+      tx = e.clientX; ty = e.clientY;
+      glow.style.opacity = '1';
+      if (!rafId) rafId = requestAnimationFrame(update);
+    });
+
+    document.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
+  }
+};
+
+/* ========================================
    Theme Toggle
    ======================================== */
 
@@ -636,6 +692,7 @@ const ClawdVideoKeyer = {
 
 (async function bootstrap() {
   BlobBackground.init();
+  MouseInteraction.init();
   Theme.init();
   MobileNav.init();
 
