@@ -52,6 +52,48 @@ const renderLines = (el, line1 = '', line2 = '') => {
 };
 
 /* ========================================
+   Dynamic Blob Background
+   ======================================== */
+
+const BlobBackground = {
+  COUNT: 5,
+  PALETTE: [
+    ['#F5B842', '#E8723A'],
+    ['#0d9488', '#0891b2'],
+    ['#7c3aed', '#a855f7'],
+    ['#e11d48', '#f43f5e'],
+    ['#2563eb', '#4f46e5'],
+    ['#059669', '#14b8a6'],
+    ['#d97706', '#f59e0b'],
+    ['#db2777', '#9333ea'],
+  ],
+
+  init() {
+    const container = document.querySelector('.bg-blobs');
+    if (!container) return;
+
+    const colors = [...this.PALETTE].sort(() => Math.random() - 0.5).slice(0, this.COUNT);
+
+    colors.forEach(([c1, c2]) => {
+      const el = document.createElement('div');
+      el.className = 'bg-blob';
+      const size    = (400 + Math.random() * 350) | 0;
+      const x       = ((Math.random() * 110) - 15) | 0;
+      const y       = ((Math.random() * 110) - 15) | 0;
+      const angle   = (Math.random() * 360) | 0;
+      const opacity = (0.3 + Math.random() * 0.25).toFixed(2);
+      const dur     = (18 + Math.random() * 18).toFixed(1);
+      const delay   = (-(Math.random() * parseFloat(dur))).toFixed(1);
+      el.style.cssText =
+        `width:${size}px;height:${size}px;left:${x}%;top:${y}%;` +
+        `background:linear-gradient(${angle}deg,${c1},${c2});` +
+        `opacity:${opacity};animation-duration:${dur}s;animation-delay:${delay}s;`;
+      container.appendChild(el);
+    });
+  }
+};
+
+/* ========================================
    Theme Toggle
    ======================================== */
 
@@ -575,6 +617,7 @@ const ClawdVideoKeyer = {
    ======================================== */
 
 (async function bootstrap() {
+  BlobBackground.init();
   Theme.init();
   MobileNav.init();
 
