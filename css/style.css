@@ -340,8 +340,8 @@ button {
 
 .hero-badge {
   display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 6px 14px;
   border-radius: var(--radius-full);
@@ -350,6 +350,7 @@ button {
   font-weight: 500;
   color: var(--accent);
   margin-bottom: 24px;
+  max-width: 100%;
 }
 
 .hero-badge svg {
@@ -358,6 +359,8 @@ button {
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .hero-title {
