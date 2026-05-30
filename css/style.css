@@ -472,6 +472,13 @@ button {
   margin-left: -2px;
 }
 
+.hero-tagline {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
 .hero-desc {
   font-size: 18px;
   line-height: 1.8;
@@ -479,8 +486,8 @@ button {
   max-width: 500px;
   padding-left: 16px;
   border-left: 3px solid var(--accent-mid);
-  margin-bottom: 32px;
   min-height: 3.4em;
+  flex: 1;
 }
 
 .hero-desc.typing::after {
@@ -489,6 +496,26 @@ button {
   opacity: 0.8;
   animation: blink 0.7s step-end infinite;
   margin-left: 1px;
+}
+
+.sig-next {
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1;
+  padding: 3px 5px;
+  margin-top: 5px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease, transform 0.3s ease;
+}
+
+.hero-tagline:hover .sig-next {
+  opacity: 1;
+}
+
+.sig-next:hover {
+  color: var(--accent);
+  transform: rotate(180deg);
 }
 
 .hero-social {
@@ -1162,10 +1189,13 @@ button {
     margin-bottom: 24px;
   }
 
+  .hero-tagline {
+    margin-bottom: 24px;
+  }
+
   .hero-desc {
     font-size: 15px;
     padding-left: 12px;
-    margin-bottom: 24px;
   }
 
   .hero-social {

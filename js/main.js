@@ -121,78 +121,81 @@ const HorizontalScroll = {
 };
 
 /* ========================================
-   Signature Rotator (typewriter)
+   Signature Rotator (typewriter state machine)
    ======================================== */
 
 const Signature = {
-  INTERVAL: 8000,
   TYPE_SPEED: 38,
   ERASE_SPEED: 18,
-  PAUSE_AFTER_TYPE: 2200,
-  PAUSE_AFTER_ERASE: 300,
+  PAUSE_AFTER_TYPE: 4500,
+  PAUSE_AFTER_ERASE: 350,
 
-  _timer: null,
   _sigs: [],
   _idx: 0,
   _el: null,
-  _abortCtrl: null,
+  _tid: null,
+  _text: '',
+  _pos: 0,
 
   init() {
     this._el = document.getElementById('heroLine1');
     if (!this._el || !window.signatures?.length) return;
     this._sigs = window.signatures;
     this._idx = Math.floor(Math.random() * this._sigs.length);
-    this._el.textContent = '';
     this._el.classList.add('typing');
-    this._run();
+
+    const btn = document.getElementById('sigNext');
+    if (btn) btn.addEventListener('click', () => this.next());
+
+    this._startTyping();
   },
 
-  _current() {
+  _getText() {
     const s = this._sigs[this._idx];
-    return s.line1 + (s.line2 ? '\n' + s.line2 : '');
+    return (s.line1 || '') + (s.line2 ? '\n' + s.line2 : '');
   },
 
-  async _run() {
-    while (true) {
-      const text = this._current();
-      await this._type(text);
-      await this._wait(this.PAUSE_AFTER_TYPE);
-      await this._erase(text.length);
-      await this._wait(this.PAUSE_AFTER_ERASE);
-      this._idx = (this._idx + 1) % this._sigs.length;
+  _render(str) {
+    this._el.innerHTML = str.replace(/\n/g, '<br>');
+  },
+
+  _startTyping() {
+    this._text = this._getText();
+    this._pos = 0;
+    this._typeTick();
+  },
+
+  _typeTick() {
+    if (this._pos > this._text.length) {
+      this._tid = setTimeout(() => this._startErasing(), this.PAUSE_AFTER_TYPE);
+      return;
     }
+    this._render(this._text.slice(0, this._pos));
+    this._pos++;
+    this._tid = setTimeout(() => this._typeTick(), this.TYPE_SPEED + (Math.random() * 18 | 0));
   },
 
-  _wait(ms) {
-    return new Promise(r => setTimeout(r, ms));
+  _startErasing() {
+    this._pos = this._text.length;
+    this._eraseTick();
   },
 
-  _type(text) {
-    return new Promise(r => {
-      let i = 0;
-      const tick = () => {
-        if (i > text.length) { r(); return; }
-        const chunk = text.slice(0, i);
-        this._el.innerHTML = chunk.replace(/\n/g, '<br>');
-        i++;
-        setTimeout(tick, this.TYPE_SPEED + (Math.random() * 18 | 0));
-      };
-      tick();
-    });
+  _eraseTick() {
+    if (this._pos < 0) {
+      this._idx = (this._idx + 1) % this._sigs.length;
+      this._tid = setTimeout(() => this._startTyping(), this.PAUSE_AFTER_ERASE);
+      return;
+    }
+    this._render(this._text.slice(0, this._pos));
+    this._pos--;
+    this._tid = setTimeout(() => this._eraseTick(), this.ERASE_SPEED);
   },
 
-  _erase(length) {
-    return new Promise(r => {
-      let i = length;
-      const tick = () => {
-        if (i < 0) { r(); return; }
-        const text = this._current().slice(0, i);
-        this._el.innerHTML = text.replace(/\n/g, '<br>');
-        i--;
-        setTimeout(tick, this.ERASE_SPEED);
-      };
-      tick();
-    });
+  next() {
+    clearTimeout(this._tid);
+    this._render('');
+    this._idx = (this._idx + 1) % this._sigs.length;
+    this._tid = setTimeout(() => this._startTyping(), this.PAUSE_AFTER_ERASE);
   }
 };
 
