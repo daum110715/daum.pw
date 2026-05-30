@@ -183,33 +183,24 @@ button {
    Grain Overlay
    ======================================== */
 
-.grain-filter {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
 .grain {
   position: fixed;
-  inset: -50%;
-  width: 200%;
-  height: 200%;
-  filter: url(#grain-noise);
-  opacity: 0.075;
+  inset: 0;
+  background-size: 64px 64px;
+  background-repeat: repeat;
+  opacity: 0.6;
   pointer-events: none;
   z-index: -1;
-  animation: grainMove 0.8s steps(4) infinite;
+  animation: grainPos 0.5s steps(4) infinite;
 }
 
-[data-theme="light"] .grain { opacity: 0.045; }
+[data-theme="light"] .grain { opacity: 0.35; }
 
-@keyframes grainMove {
-  0%   { transform: translate(0, 0); }
-  25%  { transform: translate(-4%, -3%); }
-  50%  { transform: translate(3%, 4%); }
-  75%  { transform: translate(-3%, 3%); }
+@keyframes grainPos {
+  0%   { background-position: 0 0; }
+  25%  { background-position: -32px -24px; }
+  50%  { background-position: 24px 18px; }
+  75%  { background-position: -18px 30px; }
 }
 
 /* ========================================
@@ -928,7 +919,7 @@ button {
     transition-duration: 0.001ms !important;
   }
 
-  .grain { animation: none; opacity: 0.05; }
+  .grain { animation: none; }
   .mouse-glow { display: none; }
   .bg-blob { translate: none !important; }
 }
