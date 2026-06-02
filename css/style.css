@@ -162,21 +162,19 @@ button {
 .bg-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
+  filter: blur(72px);
+  will-change: transform;
   animation: blobDrift ease-in-out infinite;
   animation-duration: 25s;
 }
 
-[data-theme="light"] .bg-blob { opacity: 0.18 !important; }
+[data-theme="light"] .bg-blob { opacity: 0.22 !important; }
 
 @keyframes blobDrift {
-  0%   { transform: translate(0, 0) scale(1); }
-  16%  { transform: translate(-14vw,  9vh) scale(1.1); }
-  33%  { transform: translate(  9vw,-13vh) scale(0.9); }
-  50%  { transform: translate( -7vw, 11vh) scale(1.08); }
-  66%  { transform: translate( 11vw, -7vh) scale(0.95); }
-  83%  { transform: translate( -4vw,-10vh) scale(1.04); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%   { transform: translate(   0px,    0px); }
+  33%  { transform: translate( -80px,   60px); }
+  66%  { transform: translate(  60px,  -80px); }
+  100% { transform: translate(   0px,    0px); }
 }
 
 /* ========================================
@@ -188,13 +186,13 @@ button {
   inset: 0;
   background-size: 64px 64px;
   background-repeat: repeat;
-  opacity: 0.6;
+  opacity: 0;
   pointer-events: none;
   z-index: -1;
   animation: grainPos 0.5s steps(4) infinite;
 }
 
-[data-theme="light"] .grain { opacity: 0.35; }
+[data-theme="light"] .grain { opacity: 0; }
 
 @keyframes grainPos {
   0%   { background-position: 0 0; }

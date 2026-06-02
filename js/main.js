@@ -79,58 +79,60 @@ const Grain = {
    ======================================== */
 
 const BlobBackground = {
-  COUNT: 5,
-  COLS: 3,
-  ROWS: 2,
-  PALETTE: [
-    ['#F5B842', '#E8723A'],
-    ['#0d9488', '#0891b2'],
-    ['#7c3aed', '#a855f7'],
-    ['#e11d48', '#f43f5e'],
-    ['#2563eb', '#4f46e5'],
-    ['#059669', '#14b8a6'],
-    ['#d97706', '#f59e0b'],
-    ['#db2777', '#9333ea'],
+  MIN_DIST: 32,
+  MAX_TRIES: 60,
+
+  BLOBS: [
+    { size: 780, dur: 22, delay:  0, dark: { c1: '#F5B842', c2: '#E8723A', opacity: 0.42 }, light: { c1: '#F5B842', c2: '#FB923C', opacity: 0.28 } },
+    { size: 720, dur: 30, delay: -9, dark: { c1: '#0d9488', c2: '#3B82F6', opacity: 0.38 }, light: { c1: '#38BDF8', c2: '#34D399', opacity: 0.24 } },
+    { size: 620, dur: 19, delay: -5, dark: { c1: '#7c3aed', c2: '#a855f7', opacity: 0.26 }, light: { c1: '#C084FC', c2: '#F472B6', opacity: 0.20 } },
   ],
+
+  _place() {
+    const placed = [];
+    return this.BLOBS.map(() => {
+      let cx, cy, tries = 0;
+      do {
+        cx = 12 + Math.random() * 76;
+        cy = 12 + Math.random() * 76;
+        tries++;
+      } while (tries < this.MAX_TRIES && placed.some(([px, py]) => {
+        const dx = px - cx, dy = py - cy;
+        return Math.sqrt(dx * dx + dy * dy) < this.MIN_DIST;
+      }));
+      placed.push([cx, cy]);
+      return { cx, cy };
+    });
+  },
 
   init() {
     const container = document.querySelector('.bg-blobs');
     if (!container) return;
 
-    const colors = [...this.PALETTE].sort(() => Math.random() - 0.5);
+    const isDark = () => document.documentElement.getAttribute('data-theme') !== 'light';
+    const positions = this._place();
 
-    // 把屏幕划成 COLS×ROWS 格，随机取 COUNT 个格，保证分散
-    const cells = Array.from({ length: this.COLS * this.ROWS }, (_, i) => ({
-      col: i % this.COLS,
-      row: Math.floor(i / this.COLS),
-    })).sort(() => Math.random() - 0.5).slice(0, this.COUNT);
+    const render = () => {
+      container.innerHTML = '';
+      this.BLOBS.forEach(({ size, dur, delay, dark, light }, i) => {
+        const { c1, c2, opacity } = isDark() ? dark : light;
+        const { cx, cy } = positions[i];
+        const el = document.createElement('div');
+        el.className = 'bg-blob';
+        const half = size / 2;
+        el.style.cssText =
+          `width:${size}px;height:${size}px;` +
+          `left:calc(${cx}% - ${half}px);top:calc(${cy}% - ${half}px);` +
+          `background:radial-gradient(circle at 45% 42%, ${c1} 0%, ${c2} 40%, transparent 68%);` +
+          `opacity:${opacity};animation-duration:${dur}s;animation-delay:${delay}s;`;
+        container.appendChild(el);
+      });
+    };
 
-    const cellW = 100 / this.COLS;
-    const cellH = 100 / this.ROWS;
-
-    cells.forEach(({ col, row }, i) => {
-      const [c1, c2] = colors[i];
-      const el = document.createElement('div');
-      el.className = 'bg-blob';
-
-      const size    = (400 + Math.random() * 350) | 0;
-      // 圆心在格内随机（留 15% 边距避免太靠边）
-      const cx      = col * cellW + (0.15 + Math.random() * 0.7) * cellW;
-      const cy      = row * cellH + (0.15 + Math.random() * 0.7) * cellH;
-      const angle   = (Math.random() * 360) | 0;
-      const opacity = (0.3 + Math.random() * 0.25).toFixed(2);
-      const dur     = (18 + Math.random() * 18).toFixed(1);
-      const delay   = (-(Math.random() * parseFloat(dur))).toFixed(1);
-      const half    = (size / 2) | 0;
-
-      el.style.cssText =
-        `width:${size}px;height:${size}px;` +
-        `left:calc(${cx.toFixed(2)}% - ${half}px);top:calc(${cy.toFixed(2)}% - ${half}px);` +
-        `background:linear-gradient(${angle}deg,${c1},${c2});` +
-        `opacity:${opacity};animation-duration:${dur}s;animation-delay:${delay}s;`;
-
-      container.appendChild(el);
-    });
+    render();
+    new MutationObserver(render).observe(
+      document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }
+    );
   }
 };
 
