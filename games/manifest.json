@@ -1,0 +1,18 @@
+{
+  "name": "小游戏合集",
+  "short_name": "小游戏",
+  "description": "8 款经典益智、纸牌与街机游戏",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#5b6d8a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

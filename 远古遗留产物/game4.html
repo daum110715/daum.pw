@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Minesweeper: Pro Edition</title>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --primary: #7c83fd;
+            --danger: #ff6b6b;
+            --text: #334155;
+            --cell-unrev: #e2e8f0;
+            --n1: #1e40af; --n2: #166534; --n3: #991b1b; --n4: #6b21a8;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; user-select: none;
+        }
+
+        /* --- 启动菜单 --- */
+        #start-menu {
+            position: fixed; inset: 0; background: var(--bg);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; transition: opacity 0.4s ease;
+        }
+        #start-menu.hide { opacity: 0; pointer-events: none; transform: scale(1.1); }
+
+        .menu-card {
+            background: white; padding: 40px; border-radius: 40px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.05); text-align: center;
+            width: 90%; max-width: 340px;
+            animation: menuIn 0.6s cubic-bezier(0.2, 1, 0.3, 1);
+        }
+        @keyframes menuIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .diff-option {
+            width: 100%; border: none; background: #f1f5f9; padding: 18px;
+            margin-bottom: 12px; border-radius: 20px; font-size: 1rem;
+            font-weight: 800; color: var(--text); cursor: pointer; transition: 0.2s;
+        }
+        .diff-option:active { background: var(--primary); color: white; transform: scale(0.95); }
+
+        /* --- 游戏主体 --- */
+        #game-app {
+            width: 100%; max-width: 440px; padding: 20px;
+            display: none; flex-direction: column; gap: 16px;
+        }
+        #game-app.show { display: flex; }
+
+        .header {
+            background: white; padding: 15px 25px; border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+            display: grid; grid-template-columns: 1fr 60px 1fr; align-items: center;
+        }
+        .stat-val { font-size: 1.6rem; font-weight: 800; font-feature-settings: 'tnum'; }
+
+        .reset-btn {
+            background: var(--primary); border: none; width: 50px; height: 50px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            color: white; cursor: pointer; justify-self: center; box-shadow: 0 6px 15px rgba(124, 131, 253, 0.4);
+        }
+
+        .board-card { background: white; padding: 12px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+        .scroller { width: 100%; max-height: 55dvh; overflow: auto; scrollbar-width: none; }
+        .scroller::-webkit-scrollbar { display: none; }
+        .grid { display: grid; gap: 6px; margin: 0 auto; position: relative; }
+
+        .cell {
+            width: 38px; height: 38px; background: var(--cell-unrev);
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 1.2rem; cursor: pointer;
+            transition: background 0.2s;
+            opacity: 0; transform: scale(0);
+        }
+
+        .cell.spawn { animation: cellGrow 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes cellGrow { to { opacity: 1; transform: scale(1); } }
+
+        .cell.rev {
+            background: white !important;
+            box-shadow: inset 0 0 0 2px #f1f5f9;
+            animation: cellPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5) forwards;
+        }
+        @keyframes cellPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .cell.mine-hit { background: #1e293b !important; color: #ff6b6b !important; z-index: 10; }
+        .cell.flag-active { color: var(--danger); }
+        
+        .n1 { color: var(--n1); } .n2 { color: var(--n2); } 
+        .n3 { color: var(--n3); } .n4 { color: var(--n4); }
+
+        /* --- 底部切换 --- */
+        .mode-nav {
+            background: white; padding: 6px; border-radius: 50px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+        }
+        .mode-btn {
+            border: none; background: transparent; padding: 14px 0; border-radius: 40px;
+            color: #94a3b8; font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; justify-content: center;
+        }
+        .mode-btn.active.dig { background: var(--primary); color: white; }
+        .mode-btn.active.flag { background: var(--danger); color: white; }
+
+        /* 结算弹窗 */
+        .overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; z-index: 5000;
+        }
+        .overlay.active { display: flex; }
+        .modal { background: white; padding: 40px; border-radius: 40px; text-align: center; width: 85%; max-width: 340px; box-shadow: 0 25px 60px rgba(0,0,0,0.1); }
+
+        .custom-menu { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); z-index: 2000; align-items: center; justify-content: center; }
+        .custom-menu.active { display: flex; }
+
+        .home-btn { position: fixed; top: 20px; left: 20px; background: white; border: none; width: 44px; height: 44px; border-radius: 50%; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); z-index: 500; }
+        .particle { position: fixed; pointer-events: none; z-index: 4000; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+    <div id="start-menu">
+        <div class="menu-card">
+            <h1 style="margin-bottom: 30px; font-weight: 900; font-size: 2.2rem; letter-spacing: -1px;">MINESWEEPER</h1>
+            <button class="diff-option" onclick="startGame('easy')">EASY</button>
+            <button class="diff-option" onclick="startGame('medium')">MEDIUM</button>
+            <button class="diff-option" onclick="startGame('hard')">EXPERT</button>
+            <button class="diff-option" onclick="toggleCustom(true)" style="background: white; border: 2.5px solid #f1f5f9;">CUSTOM</button>
+        </div>
+    </div>
+
+    <div class="custom-menu" id="custom-menu">
+        <div class="modal" style="text-align: left;">
+            <h2 style="margin-bottom: 25px; font-weight: 900;">Settings</h2>
+            <div style="margin-bottom: 15px;"><label style="font-size: 0.75rem; font-weight: 900;">ROWS (5-50)</label><input type="number" id="custom-rows" value="10" style="width: 100%; padding: 15px; border: 2px solid #f1f5f9; border-radius: 15px; outline: none; font-weight: 700;"></div>
+            <div style="margin-bottom: 15px;"><label style="font-size: 0.75rem; font-weight: 900;">COLS (5-50)</label><input type="number" id="custom-cols" value="10" style="width: 100%; padding: 15px; border: 2px solid #f1f5f9; border-radius: 15px; outline: none; font-weight: 700;"></div>
+            <div style="margin-bottom: 25px;"><label style="font-size: 0.75rem; font-weight: 900;">MINES</label><input type="number" id="custom-mines" value="15" style="width: 100%; padding: 15px; border: 2px solid #f1f5f9; border-radius: 15px; outline: none; font-weight: 700;"></div>
+            <div style="display: flex; gap: 12px;">
+                <button class="diff-option" style="background: #f1f5f9; margin:0" onclick="toggleCustom(false)">BACK</button>
+                <button class="diff-option" style="background: var(--primary); color: white; margin:0" onclick="applyCustom()">START</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="home-btn" id="home-btn" onclick="goHome()">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg>
+    </button>
+
+    <div id="game-app">
+        <div class="header">
+            <div style="text-align: left;"><p style="font-size: 0.6rem; font-weight: 900; color: #94a3b8;">MINES</p><p class="stat-val" id="mines-val">00</p></div>
+            <button class="reset-btn" onclick="initGame()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+            <div style="text-align: right;"><p style="font-size: 0.6rem; font-weight: 900; color: #94a3b8;">TIME</p><p class="stat-val" id="time-val">000</p></div>
+        </div>
+        <div class="board-card"><div class="scroller"><div class="grid" id="grid"></div></div></div>
+        <div class="mode-nav">
+            <button class="mode-btn active dig" id="btn-dig" onclick="setMode('dig')">DIG MODE</button>
+            <button class="mode-btn flag" id="btn-flag" onclick="setMode('flag')">FLAG MODE</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <h2 id="m-title" style="font-size: 2.5rem; margin-bottom: 10px; font-weight: 900;">GAME OVER</h2>
+            <p id="m-msg" style="color: #94a3b8; margin-bottom: 30px; font-weight: 700;">Try again?</p>
+            <div style="display: flex; gap: 12px;">
+                <button class="diff-option" style="background: #f1f5f9; margin:0" onclick="goHome()">MENU</button>
+                <button class="diff-option" style="background: var(--primary); color: white; margin:0" onclick="initGame()">RETRY</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = { easy: {r:9, c:9, m:10}, medium: {r:16, c:16, m:40}, hard: {r:16, c:30, m:99} };
+        let curConf = CONFIG.easy, board = [], isOver = false, time = 0, timerInt = null, isFirst = true, flags = 0, mode = 'dig';
+
+        function toggleCustom(show) { document.getElementById('custom-menu').classList.toggle('active', show); }
+
+        function applyCustom() {
+            let r = parseInt(document.getElementById('custom-rows').value) || 10, c = parseInt(document.getElementById('custom-cols').value) || 10, m = parseInt(document.getElementById('custom-mines').value) || 15;
+            r = Math.min(Math.max(r, 5), 50); c = Math.min(Math.max(c, 5), 50);
+            const maxM = Math.floor(r * c * 0.75); if(m > maxM) m = maxM;
+            curConf = { r, c, m }; toggleCustom(false); startGame('custom');
+        }
+
+        function startGame(lv) {
+            if (lv !== 'custom') curConf = CONFIG[lv];
+            document.getElementById('start-menu').classList.add('hide');
+            document.getElementById('game-app').classList.add('show');
+            document.getElementById('home-btn').style.display = 'flex';
+            initGame();
+        }
+
+        function goHome() {
+            document.getElementById('start-menu').classList.remove('hide');
+            document.getElementById('game-app').classList.remove('show');
+            document.getElementById('overlay').classList.remove('active');
+            document.getElementById('home-btn').style.display = 'none';
+            clearInterval(timerInt);
+        }
+
+        function setMode(m) {
+            mode = m;
+            document.getElementById('btn-dig').classList.toggle('active', m === 'dig');
+            document.getElementById('btn-flag').classList.toggle('active', m === 'flag');
+        }
+
+        function initGame() {
+            isOver = false; isFirst = true; time = 0; flags = 0;
+            clearInterval(timerInt); timerInt = null;
+            document.getElementById('overlay').classList.remove('active');
+            document.getElementById('mines-val').innerText = curConf.m;
+            document.getElementById('time-val').innerText = '000';
+            setMode('dig');
+
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${curConf.c}, 38px)`;
+            grid.style.width = 'fit-content'; 
+
+            board = [];
+            const centerX = curConf.c / 2, centerY = curConf.r / 2;
+
+            for(let r=0; r<curConf.r; r++) {
+                board[r] = [];
+                for(let c=0; c<curConf.c; c++) {
+                    const el = document.createElement('div');
+                    el.className = 'cell';
+                    const dist = Math.sqrt(Math.pow(c-centerX,2)+Math.pow(r-centerY,2));
+                    el.style.animationDelay = `${dist * 0.04}s`;
+                    requestAnimationFrame(() => el.classList.add('spawn'));
+
+                    el.onclick = () => handleInput(r, c);
+                    el.oncontextmenu = (e) => { e.preventDefault(); handleFlag(r, c); };
+                    grid.appendChild(el);
+                    board[r][c] = { r, c, el, isMine: false, isRev: false, isFlag: false, n: 0 };
+                }
+            }
+        }
+
+        function handleInput(r, c) {
+            if(isOver) return;
+            if(mode === 'flag') { handleFlag(r, c); return; }
+
+            const cell = board[r][c];
+            if(cell.isRev || cell.isFlag) return;
+            
+            if(isFirst) {
+                spawnMines(r, c); isFirst = false;
+                timerInt = setInterval(() => { time++; document.getElementById('time-val').innerText = time.toString().padStart(3,'0'); }, 1000);
+            }
+            if(cell.isMine) return explode(cell);
+            reveal(r, c);
+            
+            if(board.flat().every(x => x.isMine || x.isRev)) endGame(true);
+        }
+
+        function handleFlag(r, c) {
+            const cell = board[r][c]; 
+            if(isOver || cell.isRev) return;
+            
+            cell.isFlag = !cell.isFlag; 
+            if (cell.isFlag) {
+                cell.el.innerText = 'F'; // 用 F 代替旗子
+                cell.el.classList.add('flag-active');
+                flags++;
+            } else {
+                cell.el.innerText = '';
+                cell.el.classList.remove('flag-active');
+                flags--;
+            }
+            document.getElementById('mines-val').innerText = Math.max(0, curConf.m - flags);
+        }
+
+        function spawnMines(sr, sc) {
+            const candidates = [];
+            for (let r = 0; r < curConf.r; r++) {
+                for (let c = 0; c < curConf.c; c++) {
+                    if (Math.abs(r - sr) > 1 || Math.abs(c - sc) > 1) {
+                        candidates.push({ r, c });
+                    }
+                }
+            }
+            for (let i = candidates.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+            const count = Math.min(curConf.m, candidates.length);
+            for (let i = 0; i < count; i++) {
+                board[candidates[i].r][candidates[i].c].isMine = true;
+            }
+            board.flat().forEach(cell => {
+                if(cell.isMine) return;
+                let n = 0;
+                for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) if(board[cell.r+i]?.[cell.c+j]?.isMine) n++;
+                cell.n = n;
+            });
+        }
+
+        function reveal(r, c) {
+            const cell = board[r]?.[c];
+            if(!cell || cell.isRev || cell.isFlag) return;
+            cell.isRev = true; 
+            cell.el.classList.add('rev');
+            
+            if(cell.n > 0) {
+                cell.el.innerText = cell.n;
+                cell.el.classList.add('n' + (cell.n > 4 ? 4 : cell.n));
+            } else {
+                for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) {
+                    setTimeout(() => reveal(r+i, c+j), 35);
+                }
+            }
+        }
+
+        function explode(cell) {
+            isOver = true; clearInterval(timerInt);
+            const rect = cell.el.getBoundingClientRect();
+            const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+            for(let i=0; i<45; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle'; p.style.width = p.style.height = (Math.random()*12+6)+'px';
+                p.style.background = ['#FF6B6B','#FFD93D','#444'][Math.floor(Math.random()*3)];
+                document.body.appendChild(p);
+                const a = Math.random()*Math.PI*2, d = Math.random()*220+50;
+                p.animate([{transform:`translate(${cx}px,${cy}px) scale(1)`,opacity:1},{transform:`translate(${cx+Math.cos(a)*d}px,${cy+Math.sin(a)*d}px) scale(0)`,opacity:0}], {duration:900,easing:'cubic-bezier(0, .8, .3, 1)'}).onfinish = () => p.remove();
+            }
+            cell.el.classList.add('mine-hit'); 
+            cell.el.innerText = 'X'; // 踩中的雷
+            board.flat().forEach(c => { 
+                if(c.isMine && c !== cell) { 
+                    setTimeout(()=> {
+                        c.el.innerText = '*'; // 未踩中的雷
+                        c.el.style.background = '#AAA';
+                    }, Math.random()*400); 
+                }
+            });
+            setTimeout(() => endGame(false), 1200);
+        }
+
+        function endGame(win) {
+            const t = document.getElementById('m-title');
+            t.innerText = win ? "CLEARED" : "BOOM"; t.style.color = win ? "#10b981" : "#f56565";
+            document.getElementById('m-msg').innerText = win ? `Time: ${time}s` : "Game Over";
+            document.getElementById('overlay').classList.add('active');
+        }
+    </script>
+</body>
+</html>

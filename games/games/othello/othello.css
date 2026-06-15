@@ -1,0 +1,85 @@
+/* ===== Othello 黑白棋 ===== */
+
+.board {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.othello-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(480px, 92vw);
+  height: min(480px, 92vw);
+  background: var(--bg-glass);
+  border: 2px solid var(--line-hover);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+
+.othello-cell {
+  border: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.othello-cell:hover:not(.has-disc) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.othello-disc {
+  width: 76%;
+  height: 76%;
+  border-radius: 50%;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.othello-disc.black {
+  background: radial-gradient(circle at 35% 35%, #444, #111);
+}
+
+.othello-disc.white {
+  background: radial-gradient(circle at 35% 35%, #fff, #ddd);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* 合法落子提示 */
+.othello-cell.valid-move::after {
+  content: "";
+  position: absolute;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.35;
+}
+
+/* 最后落子标记 */
+.othello-cell.last-move .othello-disc {
+  box-shadow: 0 0 0 3px var(--danger), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .othello-board {
+    width: min(380px, 96vw);
+    height: min(380px, 96vw);
+  }
+}
+
+@media (max-width: 400px) {
+  .othello-board {
+    width: min(300px, 98vw);
+    height: min(300px, 98vw);
+  }
+}

@@ -1,0 +1,102 @@
+/* ===== Gomoku 五子棋 ===== */
+
+.board {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.gomoku-board {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  grid-template-rows: repeat(15, 1fr);
+  width: min(540px, 92vw);
+  height: min(540px, 92vw);
+  background:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px),
+    var(--bg-glass);
+  background-size:
+    calc(100% / 14) calc(100% / 14),
+    calc(100% / 14) calc(100% / 14),
+    100% 100%;
+  border: 2px solid var(--line-hover);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gomoku-cell {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gomoku-cell:hover:not(.has-stone) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* 天元及星位小点 */
+.gomoku-cell.star::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.5;
+}
+
+.gomoku-stone {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  position: relative;
+  z-index: 1;
+}
+
+.gomoku-stone.black {
+  background: radial-gradient(circle at 35% 35%, #444, #111);
+}
+
+.gomoku-stone.white {
+  background: radial-gradient(circle at 35% 35%, #fff, #ddd);
+  border: 1px solid rgba(0,0,0,0.15);
+}
+
+.gomoku-cell.last-move .gomoku-stone::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: var(--danger);
+  opacity: 0.85;
+}
+
+.gomoku-cell.win-line .gomoku-stone {
+  box-shadow: 0 0 0 3px var(--danger), 0 1px 3px rgba(0,0,0,0.25);
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .gomoku-board {
+    width: min(420px, 96vw);
+    height: min(420px, 96vw);
+  }
+}
+
+@media (max-width: 400px) {
+  .gomoku-board {
+    width: min(340px, 98vw);
+    height: min(340px, 98vw);
+  }
+}

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赛博小玩意 - Daum Playground</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            background: linear-gradient(135deg, #e8f0f5 0%, #d1c8e6 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            padding: 20px;
+        }
+
+        .nav-back {
+            align-self: flex-start;
+            max-width: 440px;
+            margin: 0 auto 15px;
+            width: 100%;
+            font-size: 0.85rem;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .nav-back a {
+            color: #673ab7; 
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .portal-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            width: 100%;
+            max-width: 440px;
+            border-radius: 32px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+            padding: 40px 30px 40px; 
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo { font-size: 1.8rem; font-weight: 800; color: #4527a0; letter-spacing: -1px; }
+        .logo span { color: #9575cd; }
+        .slogan { font-size: 0.9rem; color: #777; margin-top: 5px; }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .game-item {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            padding: 16px;
+            border-radius: 18px;
+            text-decoration: none;
+            color: #333;
+            border: 1px solid #f0f0f0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+
+        @media (hover: hover) {
+            .game-item:hover {
+                transform: scale(1.03);
+                border-color: #b39ddb;
+                box-shadow: 0 10px 20px rgba(103, 58, 183, 0.08);
+            }
+        }
+
+        .game-item:active {
+            transform: scale(0.98);
+            background: #f8f6fc;
+        }
+
+        .icon-box {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .icon-text {
+            font-size: 1.3rem;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        .bg-muyu { background-color: #e0f2f1; color: #00695c; }
+
+        .info h3 { font-size: 1rem; font-weight: 700; margin-bottom: 2px; }
+        .info p { font-size: 0.75rem; color: #999; }
+
+        .footer { margin-top: 40px; font-size: 0.7rem; color: #bcaaa4; text-align: center; }
+
+        @media screen and (orientation: landscape) {
+            body { padding: 30px 10px; }
+            .nav-back { max-width: 860px; }
+            .portal-card { max-width: 860px; padding: 60px 50px 50px; }
+            .page-header { margin-bottom: 40px; }
+            .game-grid { grid-template-columns: 1fr 1fr; gap: 20px; }
+            @media (max-height: 480px) {
+                .portal-card { padding: 30px 50px 30px; }
+                .page-header { margin-bottom: 25px; }
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="nav-back">
+        <a href="daumgame.html">← 返回游乐空间</a> / 赛博小玩意
+    </div>
+
+    <div class="portal-card">
+        
+        <div class="page-header">
+            <div class="logo">Cyber <span>Gadgets</span></div>
+            <p class="slogan">奇趣交互 · 视觉实验</p>
+        </div>
+
+        <div class="game-grid">
+            <a href="muyu/muyu.html" class="game-item">
+                <div class="icon-box bg-muyu"><span class="icon-text">Mu</span></div>
+                <div class="info">
+                    <h3>赛博木鱼</h3>
+                    <p>电子功德 · 赛博修行</p>
+                </div>
+            </a>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 Designed by Daum
+        </div>
+    </div>
+
+</body>
+</html>

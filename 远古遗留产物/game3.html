@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Minesweeper: Pure Text Pro</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --primary: #a5c7f7;
+            --danger: #ffb3b3;
+            --text: #4a5568;
+            --cell-bg: #edf2f7;
+            --border-w: 3px;
+            --spring: cubic-bezier(0.175, 0.885, 0.32, 1.4);
+            --rainbow: linear-gradient(90deg, #ff9a9e, #fad0c4, #fbc2eb, #a1c4fd, #c2e9fb, #84fab0, #ff9a9e);
+            /* 暴力对比度数字颜色 */
+            --n1: #1e40af; --n2: #15803d; --n3: #b91c1c; --n4: #7e22ce;
+        }
+
+        @keyframes rainbowFlow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8fafc;
+            color: var(--text);
+            min-height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; user-select: none;
+        }
+
+        /* 镶边容器 */
+        .rainbow-inset {
+            position: relative;
+            padding: var(--border-w);
+            background: var(--rainbow);
+            background-size: 200% 200%;
+            border-radius: 32px;
+            animation: rainbowFlow 6s linear infinite;
+        }
+
+        .inner-content {
+            background: #ffffff;
+            border-radius: 29px;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        /* 菜单屏 */
+        #menu-screen {
+            position: fixed; inset: 0; background: #fff;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; transition: 0.4s var(--spring);
+        }
+        #menu-screen.hide { opacity: 0; pointer-events: none; transform: scale(0.9); }
+
+        .btn {
+            width: 100%; border: none; background: #f1f5f9; padding: 18px;
+            margin-bottom: 12px; border-radius: 50px;
+            font-size: 1.1rem; font-weight: 900; color: var(--text); cursor: pointer;
+            transition: all 0.3s var(--spring);
+            display: flex; align-items: center; justify-content: center;
+            text-transform: uppercase;
+        }
+        .btn:active { transform: scale(0.85); background: var(--primary); color: white; }
+
+        /* 游戏界面 */
+        #game-screen {
+            display: none; width: 100%; max-width: 440px; padding: 20px;
+            flex-direction: column; gap: 15px;
+        }
+        #game-screen.show { display: flex; animation: qIn 0.6s var(--spring); }
+        @keyframes qIn { from { transform: scale(0.6); opacity: 0; } }
+
+        .header-grid {
+            display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+            padding: 12px 20px; width: 100%;
+        }
+        .stat-val { font-size: 1.8rem; font-weight: 900; line-height: 1; margin-top: 5px; color: #2d3748; }
+        .stat-label { font-size: 0.65rem; font-weight: 900; color: #cbd5e1; }
+
+        .reset-btn {
+            width: 52px; height: 52px; background: var(--primary); border: none;
+            border-radius: 50%; color: white; font-size: 1rem; font-weight: 900;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: transform 0.5s var(--spring);
+        }
+        .reset-btn:active { transform: scale(0.8) rotate(180deg); }
+
+        /* 棋盘 - 暴力字体加成 */
+        .board-wrap { padding: 10px; overflow: auto; scrollbar-width: none; width: 100%; }
+        .grid { display: grid; gap: 7px; margin: 0 auto; }
+
+        .cell {
+            width: 42px; height: 42px; background: var(--cell-bg);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 28px !important; font-weight: 900; cursor: pointer;
+            opacity: 0; transform: scale(0);
+        }
+        .cell.spawn { animation: qPop 0.5s var(--spring) forwards; }
+        .cell.rev {
+            background: #ffffff !important;
+            box-shadow: inset 0 0 0 2px #f1f5f9;
+            animation: squish 0.4s var(--spring) forwards;
+        }
+        @keyframes qPop { to { opacity: 1; transform: scale(1); } }
+        @keyframes squish { 0% { transform: scale(0.5); } 100% { transform: scale(1); opacity: 1; } }
+
+        /* 切换按钮 - 纯文字 */
+        .footer-inset { border-radius: 50px; padding: 4px; width: 100%; }
+        .footer-inner { padding: 6px; border-radius: 50px; width: 100%; }
+
+        #mode-toggle-btn {
+            width: 100%; height: 56px; border: none; border-radius: 40px;
+            font-weight: 900; font-size: 1.2rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.4s var(--spring);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            letter-spacing: 2px;
+        }
+        #mode-toggle-btn.mode-dig { background: var(--primary); }
+        #mode-toggle-btn.mode-flag { background: var(--danger); }
+        #mode-toggle-btn:active { transform: scale(0.9); }
+        .pop-anim { animation: togglePop 0.4s var(--spring); }
+        @keyframes togglePop { 0% { transform: scale(0.8); } 50% { transform: scale(1.05); } }
+
+        .n1 { color: var(--n1); } .n2 { color: var(--n2); } .n3 { color: var(--n3); } .n4 { color: var(--n4); }
+
+        /* 输入设置 */
+        .input-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; width: 100%; }
+        .input-item label { font-weight: 800; font-size: 0.9rem; color: #94a3b8; }
+        .input-item input {
+            width: 80px; padding: 10px; border: 2.5px solid #edf2f7;
+            border-radius: 14px; text-align: center; font-weight: 900; outline: none; font-size: 1rem;
+        }
+
+        /* 结算 */
+        .overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.7);
+            backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; z-index: 200;
+        }
+        .overlay.active { display: flex; }
+        .particle { position: fixed; pointer-events: none; z-index: 1000; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <div class="rainbow-inset" style="width: 90%; max-width: 350px;">
+            <div class="inner-content" style="padding: 40px 30px;">
+                <h1 style="margin-bottom: 30px; font-weight: 900; font-size: 2.4rem; letter-spacing: -2px;">Minesweeper</h1>
+                <button class="btn" onclick="Game.start('easy')">EASY (9x9)</button>
+                <button class="btn" onclick="Game.start('medium')">NORMAL (16x16)</button>
+                <button class="btn" onclick="Game.start('hard')">EXPERT (16x30)</button>
+                <hr style="width: 100%; margin: 20px 0; opacity: 0.1;">
+                <div class="input-item"><label>Rows</label><input type="number" id="r-inp" value="10"></div>
+                <div class="input-item"><label>Cols</label><input type="number" id="c-inp" value="10"></div>
+                <div class="input-item"><label>Mines</label><input type="number" id="m-inp" value="15"></div>
+                <button class="btn" style="background: var(--primary); color: white; margin-top: 10px;" onclick="Game.start('custom')">START GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <div class="rainbow-inset">
+            <div class="inner-content header-grid">
+                <div style="text-align: left;"><span class="stat-label">MINES</span><br><b class="stat-val" id="ui-mines">00</b></div>
+                <button class="reset-btn" onclick="Game.init()">RE</button>
+                <div style="text-align: right;"><span class="stat-label">TIME</span><br><b class="stat-val" id="ui-time">000</b></div>
+            </div>
+        </div>
+
+        <div class="rainbow-inset">
+            <div class="inner-content board-wrap">
+                <div id="grid" class="grid"></div>
+            </div>
+        </div>
+
+        <div class="rainbow-inset footer-inset">
+            <div class="inner-content footer-inner">
+                <button id="mode-toggle-btn" onclick="Game.toggleMode()">DIG</button>
+            </div>
+        </div>
+        <button class="btn" style="background: transparent; color: #cbd5e1; font-size: 0.8rem; margin-top: 5px;" onclick="location.reload()">BACK TO MENU</button>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="rainbow-inset" style="width: 80%; max-width: 320px;">
+            <div class="inner-content" style="padding: 40px 30px; text-align: center;">
+                <h1 id="msg-title" style="font-weight: 900; font-size: 2.2rem; margin-bottom: 10px;">BOOM!</h1>
+                <p id="msg-body" style="margin-bottom: 25px; font-weight: 700; color: #718096;"></p>
+                <button class="btn" style="background: var(--primary); color: white;" onclick="Game.init()">RETRY</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const Game = {
+            config: { r: 9, c: 9, m: 10 },
+            board: [],
+            isOver: false,
+            time: 0,
+            timer: null,
+            first: true,
+            mode: 'dig',
+            flags: 0,
+
+            start(type) {
+                if (type === 'custom') {
+                    const r = Math.min(50, Math.max(5, parseInt(document.getElementById('r-inp').value) || 10));
+                    const c = Math.min(50, Math.max(5, parseInt(document.getElementById('c-inp').value) || 10));
+                    const m = Math.min(Math.floor(r * c * 0.7), Math.max(1, parseInt(document.getElementById('m-inp').value) || 15));
+                    this.config = { r, c, m };
+                } else {
+                    const presets = { easy:[9,9,10], medium:[16,16,40], hard:[16,30,99] };
+                    const p = presets[type];
+                    this.config = { r:p[0], c:p[1], m:p[2] };
+                }
+                document.getElementById('menu-screen').classList.add('hide');
+                document.getElementById('game-screen').classList.add('show');
+                this.init();
+            },
+
+            init() {
+                this.isOver = false; this.first = true; this.time = 0; this.flags = 0;
+                clearInterval(this.timer);
+                document.getElementById('ui-time').innerText = '000';
+                document.getElementById('ui-mines').innerText = this.config.m;
+                document.getElementById('overlay').classList.remove('active');
+                this.mode = 'dig';
+                this.updateToggleButton(false); 
+
+                const grid = document.getElementById('grid');
+                grid.innerHTML = '';
+                grid.style.gridTemplateColumns = `repeat(${this.config.c}, 42px)`;
+                
+                this.board = [];
+                for (let r = 0; r < this.config.r; r++) {
+                    this.board[r] = [];
+                    for (let c = 0; c < this.config.c; c++) {
+                        const el = document.createElement('div');
+                        el.className = 'cell';
+                        el.style.animationDelay = `${(r + c) * 0.02}s`;
+                        requestAnimationFrame(() => el.classList.add('spawn'));
+                        el.onclick = () => this.handleAction(r, c);
+                        grid.appendChild(el);
+                        this.board[r][c] = { r, c, el, isMine: false, isRev: false, isFlag: false, n: 0 };
+                    }
+                }
+            },
+
+            toggleMode() {
+                this.mode = (this.mode === 'dig' ? 'flag' : 'dig');
+                this.updateToggleButton(true);
+            },
+
+            updateToggleButton(withAnim) {
+                const btn = document.getElementById('mode-toggle-btn');
+                btn.innerText = this.mode.toUpperCase();
+                btn.className = (this.mode === 'dig' ? 'mode-dig' : 'mode-flag');
+                if (withAnim) {
+                    btn.classList.add('pop-anim');
+                    setTimeout(() => btn.classList.remove('pop-anim'), 400);
+                }
+            },
+
+            // 洗牌算法：彻底解决自定义地图卡死问题
+            generateMines(sr, sc) {
+                const candidates = [];
+                for (let r = 0; r < this.config.r; r++) {
+                    for (let c = 0; c < this.config.c; c++) {
+                        // 初始点击点及其周围 3x3 必须安全
+                        if (Math.abs(r - sr) > 1 || Math.abs(c - sc) > 1) {
+                            candidates.push({r, c});
+                        }
+                    }
+                }
+                // Shuffle
+                for (let i = candidates.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+                }
+                // 选取雷位
+                const count = Math.min(this.config.m, candidates.length);
+                for (let i = 0; i < count; i++) {
+                    const p = candidates[i];
+                    this.board[p.r][p.c].isMine = true;
+                }
+                // 计算数字
+                this.board.flat().forEach(cell => {
+                    if (cell.isMine) return;
+                    let n = 0;
+                    for (let i = -1; i <= 1; i++) 
+                        for (let j = -1; j <= 1; j++) 
+                            if (this.board[cell.r + i]?.[cell.c + j]?.isMine) n++;
+                    cell.n = n;
+                });
+            },
+
+            handleAction(r, c) {
+                if (this.isOver) return;
+                const cell = this.board[r][c];
+                if (cell.isRev) return;
+
+                if (this.mode === 'flag') {
+                    cell.isFlag = !cell.isFlag;
+                    cell.el.innerText = cell.isFlag ? 'F' : '';
+                    cell.el.style.color = cell.isFlag ? 'var(--danger)' : '';
+                    this.flags += cell.isFlag ? 1 : -1;
+                    document.getElementById('ui-mines').innerText = this.config.m - this.flags;
+                    return;
+                }
+
+                if (cell.isFlag) return;
+
+                if (this.first) {
+                    this.first = false;
+                    this.generateMines(r, c);
+                    this.timer = setInterval(() => {
+                        this.time++;
+                        document.getElementById('ui-time').innerText = this.time.toString().padStart(3, '0');
+                    }, 1000);
+                }
+
+                if (cell.isMine) this.explode(cell);
+                else { this.reveal(r, c); this.checkWin(); }
+            },
+
+            reveal(r, c) {
+                const cell = this.board[r]?.[c];
+                if (!cell || cell.isRev || cell.isFlag) return;
+                cell.isRev = true;
+                cell.el.className = 'cell rev';
+                if (cell.n > 0) {
+                    cell.el.textContent = cell.n;
+                    cell.el.classList.add('n' + (cell.n > 4 ? 4 : cell.n));
+                } else {
+                    for (let i = -1; i <= 1; i++) 
+                        for (let j = -1; j <= 1; j++) this.reveal(r + i, c + j);
+                }
+            },
+
+            explode(hitCell) {
+                this.isOver = true; clearInterval(this.timer);
+                const rect = hitCell.el.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+
+                // 物理喷射碎屑
+                for (let i = 0; i < 40; i++) {
+                    const p = document.createElement('div');
+                    p.className = 'particle';
+                    const size = Math.random() * 12 + 8;
+                    p.style.width = p.style.height = size + 'px';
+                    p.style.background = ['#ff9a9e', '#a1c4fd', '#84fab0', '#fff'][Math.floor(Math.random()*4)];
+                    document.body.appendChild(p);
+                    const a = Math.random() * Math.PI * 2, d = Math.random() * 220 + 50;
+                    p.animate([
+                        { transform: `translate(${cx}px, ${cy}px) scale(1)`, opacity: 1 },
+                        { transform: `translate(${cx + Math.cos(a)*d}px, ${cy + Math.sin(a)*d + 200}px) scale(0)`, opacity: 0 }
+                    ], { duration: 1200, easing: 'cubic-bezier(0, .8, .3, 1)' }).onfinish = () => p.remove();
+                }
+
+                hitCell.el.innerText = 'X';
+                hitCell.el.style.background = '#334155';
+                hitCell.el.style.color = '#fff';
+
+                this.board.flat().forEach(c => {
+                    if (c.isMine && c !== hitCell) {
+                        setTimeout(() => { c.el.innerText = 'M'; c.el.style.background = '#eee'; c.el.style.color = '#4a5568'; }, Math.random() * 600);
+                    }
+                });
+                setTimeout(() => this.showEnd("BOOM!", "GAME OVER"), 1500);
+            },
+
+            checkWin() {
+                if (this.board.flat().filter(c => !c.isRev && !c.isMine).length === 0) {
+                    this.isOver = true; clearInterval(this.timer);
+                    this.board.flat().forEach(c => { if(c.isMine) c.el.innerText = 'W'; });
+                    this.showEnd("PERFECT!", `TIME: ${this.time}S`);
+                }
+            },
+
+            showEnd(title, msg) {
+                document.getElementById('msg-title').innerText = title;
+                document.getElementById('msg-body').innerText = msg;
+                document.getElementById('overlay').classList.add('active');
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,393 @@
+/* ===== 数独 Sudoku ===== */
+
+:root {
+  --cell-size: 52px;
+  --board-gap: 0px;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ----- 顶栏 ----- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--bg-glass);
+  backdrop-filter: var(--backdrop-card);
+  -webkit-backdrop-filter: var(--backdrop-card);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-right button,
+.topbar-right .custom-dropdown-trigger {
+  min-height: 34px;
+}
+.topbar-stats {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.stat-label {
+  color: var(--muted);
+}
+.stat span:not(.stat-label) {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.back-link {
+  color: var(--ink-soft);
+  font-size: 13px;
+  transition: color 0.15s;
+}
+.back-link:hover {
+  color: var(--ink);
+}
+.game-name {
+  font-weight: 600;
+  letter-spacing: 1px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* ----- 主区 ----- */
+.board-wrap {
+  padding: 36px 16px 60px;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ----- 数独网格 ----- */
+#board {
+  display: grid;
+  grid-template-columns: repeat(9, var(--cell-size));
+  grid-template-rows: repeat(9, var(--cell-size));
+  gap: var(--board-gap);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-slot);
+}
+
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg-card-face);
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+}
+
+/* 3x3 宫格粗边框 */
+.cell:nth-child(9n+3),
+.cell:nth-child(9n+6) {
+  border-right: 2px solid var(--line);
+}
+.cell:nth-child(n+19):nth-child(-n+27),
+.cell:nth-child(n+46):nth-child(-n+54) {
+  border-bottom: 2px solid var(--line);
+}
+.cell:nth-child(9n) {
+  border-right: none;
+}
+.cell:nth-child(n+73) {
+  border-bottom: none;
+}
+
+.cell:hover {
+  background: var(--bg-glass-hover);
+}
+
+.cell.selected {
+  background: var(--accent);
+  color: #fff;
+}
+.cell.highlight {
+  background: rgba(91, 109, 138, 0.12);
+}
+.cell.selected.highlight {
+  background: var(--accent);
+}
+
+.cell.fixed {
+  color: var(--muted);
+  font-weight: 700;
+}
+.cell.conflict {
+  color: var(--danger);
+  background: rgba(197, 56, 74, 0.08);
+}
+.cell.conflict.selected {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* 笔记小数字 */
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  padding: 2px;
+}
+.note-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+}
+
+/* ----- 数字键盘 ----- */
+.numpad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 420px;
+}
+.numpad .num-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: var(--bg-glass);
+  border: var(--border-width) var(--border-style) var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.numpad .num-btn:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--line-hover);
+}
+.numpad .num-btn:active {
+  transform: translateY(1px);
+}
+.numpad .num-btn.wide {
+  width: 104px;
+  font-size: 14px;
+}
+.numpad .num-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ----- 覆盖层 ----- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-overlay);
+  -webkit-backdrop-filter: var(--backdrop-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay-card {
+  background: var(--bg-glass-hover);
+  backdrop-filter: var(--backdrop-overlay);
+  -webkit-backdrop-filter: var(--backdrop-overlay);
+  border: var(--border-width) var(--border-style) var(--border-overlay);
+  border-radius: var(--radius-xl);
+  padding: 44px 52px;
+  box-shadow: var(--shadow-overlay);
+  text-align: center;
+  min-width: 300px;
+}
+.overlay-title {
+  font-size: 26px;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.overlay-stats {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin: 22px 0 30px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.overlay-stats strong {
+  color: var(--ink);
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+/* confirm */
+.confirm-card {
+  min-width: 320px;
+  padding: 36px 44px;
+}
+.confirm-message {
+  font-size: 15px;
+  color: var(--ink);
+  margin-bottom: 28px;
+  line-height: 1.5;
+  text-align: left;
+}
+.confirm-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.confirm-buttons button.secondary {
+  background: transparent;
+  border-color: var(--line);
+}
+.confirm-buttons button.secondary:hover {
+  background: var(--bg-glass);
+}
+
+/* help */
+.help-section {
+  margin-top: 16px;
+  text-align: left;
+}
+.help-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.help-rules {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.help-rules p {
+  margin: 0 0 6px 0;
+}
+.help-rules strong {
+  color: var(--ink);
+}
+.help-content {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.help-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.help-row kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-glass);
+  border: var(--border-width) var(--border-style) var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-highlight);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  margin: 16px auto 0;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ----- Responsive ----- */
+@media (max-width: 560px) {
+  :root {
+    --cell-size: 40px;
+  }
+  .board-wrap {
+    padding: 20px 10px 40px;
+  }
+  .topbar {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .topbar-stats {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    gap: 14px;
+  }
+  .numpad .num-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  .numpad .num-btn.wide {
+    width: 88px;
+  }
+}
+
+@media (max-width: 400px) {
+  :root {
+    --cell-size: 36px;
+  }
+  .cell {
+    font-size: 18px;
+  }
+  .note-grid span {
+    font-size: 8px;
+  }
+}

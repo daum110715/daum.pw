@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>贪吃蛇</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css?v=2" />
+  <link rel="stylesheet" href="snake.css?v=2" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">贪吃蛇</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">分数</span><span id="stat-score">0</span></span>
+      <span class="stat"><span class="stat-label">最佳</span><span id="stat-high">0</span></span>
+      <span class="stat"><span class="stat-label">长度</span><span id="stat-length">3</span></span>
+      <span class="stat"><span class="stat-label">模式</span><span id="stat-mode">经典</span></span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch">手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <select id="mode-select" title="游戏模式">
+        <option value="classic">经典模式</option>
+        <option value="wrap">穿墙模式</option>
+      </select>
+      <button id="btn-pause" type="button">暂停</button>
+      <button id="btn-help" type="button" title="帮助 (?)">?</button>
+      <button id="btn-new" type="button">新游戏</button>
+    </div>
+  </div>
+
+  <main class="page">
+    <section class="game-shell">
+      <div class="stats-section">
+        <section class="stats-panel">
+          <div class="panel-head">
+            <div>
+              <h2>对局数据</h2>
+              <div class="panel-subtitle">本地记录，按当前浏览器保存</div>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stats-item">
+              <span class="stats-label">开局</span>
+              <strong id="stats-started">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">胜利</span>
+              <strong id="stats-won">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">胜率</span>
+              <strong id="stats-win-rate">0%</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">最佳得分</span>
+              <strong id="stats-best-score">-</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">平均得分</span>
+              <strong id="stats-avg-score">-</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">总时长</span>
+              <strong id="stats-total-time">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-panel recent-panel">
+          <div class="panel-head">
+            <div>
+              <h2>近期战绩</h2>
+              <div class="panel-subtitle">只记录已结束的对局</div>
+            </div>
+          </div>
+          <div class="recent-list" id="recent-list">
+            <div class="recent-empty">暂无记录</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board" id="board"></div>
+        <div id="start-overlay" class="start-overlay">
+          <button id="start-btn" type="button">点击开始游戏</button>
+          <div class="start-hint">或按空格 / 方向键</div>
+        </div>
+        <div id="pause-overlay" class="board-pause" hidden>
+          <div class="board-pause-card">
+            <div class="board-pause-title">已暂停</div>
+            <button id="pause-resume" type="button">继续</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="gameover-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title" id="final-title">游戏结束</div>
+      <div class="overlay-stats">
+        <div>最终得分 <strong id="final-score">0</strong></div>
+        <div>蛇身长度 <strong id="final-length">0</strong></div>
+        <div>游戏模式 <strong id="final-mode">经典模式</strong></div>
+      </div>
+      <div class="overlay-actions">
+        <button id="overlay-new" type="button">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">确认操作</div>
+      <div class="overlay-stats">当前对局尚未结束，确定要开始新游戏吗？</div>
+      <div class="overlay-actions">
+        <button id="confirm-cancel" type="button">取消</button>
+        <button id="confirm-ok" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>使用方向键或滑动屏幕控制蛇移动，吃掉红色食物得分，蛇身会变长。</p>
+          <p>经典模式：撞到墙壁或自己的身体则游戏结束。</p>
+          <p>穿墙模式：蛇可以从一侧穿出，从对侧进入。</p>
+          <p>填满整个棋盘即可完美通关！</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">操作方式</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>方向键 / WASD</kbd><span>移动</span></div>
+          <div class="help-row"><kbd>空格</kbd><span>暂停/继续</span></div>
+          <div class="help-row"><kbd>R</kbd><span>新游戏</span></div>
+          <div class="help-row"><kbd>?</kbd><span>打开帮助</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗</span></div>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js?v=2"></script>
+  <script src="../../scripts/confetti.js?v=2"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="snake.js?v=2"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

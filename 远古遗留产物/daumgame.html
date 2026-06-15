@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daum Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+    --bg:#f2f0ea; --paper:rgba(248,246,240,0.84);
+    --ink:#1c1e18; --ink-mid:#4a4d42; --ink-dim:#8a8d80;
+    --gold:#8a6f3a; --gold-line:rgba(138,111,58,0.35);
+    --sage:#3d5c3a; --sage-line:rgba(61,92,58,0.2);
+    --border:rgba(28,30,24,0.1); --border-md:rgba(28,30,24,0.14);
+    --shadow:rgba(28,30,24,0.07);
+}
+body{
+    font-family:'Sora',system-ui,sans-serif; font-weight:300;
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    padding:24px 20px; background:var(--bg);
+    color:var(--ink); overflow-x:hidden; position:relative;
+}
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.bg::before{
+    content:''; position:absolute; inset:0;
+    background:
+        radial-gradient(ellipse 60% 50% at 15% 20%,rgba(210,220,195,0.7) 0%,transparent 70%),
+        radial-gradient(ellipse 50% 60% at 85% 80%,rgba(205,215,185,0.5) 0%,transparent 70%);
+    animation:shift 20s ease-in-out infinite alternate;
+}
+@keyframes shift{0%{transform:scale(1);}100%{transform:scale(1.04) translate(12px,8px);}}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0.045;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:180px 180px;}
+
+.nav-back{
+    position:relative;z-index:2;
+    align-self:flex-start; max-width:420px; margin:0 auto 14px; width:100%;
+    font-size:0.68rem; color:var(--ink-dim); letter-spacing:0.06em;
+    font-family:'Sora',sans-serif;
+}
+.nav-back a{color:var(--sage);text-decoration:none;font-weight:500;}
+.nav-back a:hover{color:var(--ink);}
+
+.card{
+    position:relative;z-index:2;
+    width:100%;max-width:420px;
+    border-radius:3px; padding:48px 42px 42px;
+    background:var(--paper);
+    backdrop-filter:blur(16px) saturate(160%);
+    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    border:1px solid var(--border-md);
+    box-shadow:0 1px 0 rgba(255,255,255,0.9) inset,0 -1px 0 var(--border) inset,
+        0 4px 6px var(--shadow),0 16px 40px rgba(28,30,24,0.09),0 40px 80px rgba(28,30,24,0.06);
+    animation:arrive 0.85s cubic-bezier(0.22,1,0.36,1) both;
+}
+.card::before{content:'';position:absolute;top:0;left:8%;right:8%;height:1px;
+    background:linear-gradient(90deg,transparent,var(--gold-line),transparent);}
+.card::after{content:'';position:absolute;bottom:0;left:20%;right:20%;height:1px;
+    background:linear-gradient(90deg,transparent,var(--sage-line),transparent);}
+@keyframes arrive{from{opacity:0;transform:translateY(28px) scale(0.985);}to{opacity:1;transform:translateY(0) scale(1);}}
+
+/* header */
+.header-main{display:flex;align-items:center;justify-content:center;gap:22px;}
+.cube-wrap{perspective:700px;flex-shrink:0;}
+.big-cube{width:52px;height:52px;position:relative;transform-style:preserve-3d;animation:spinCube 10s linear infinite;}
+.big-cube div{position:absolute;width:52px;height:52px;
+    border:1px solid rgba(61,92,58,0.28);background:rgba(61,92,58,0.05);}
+.fc{transform:translateZ(26px);} .bc{transform:rotateY(180deg) translateZ(26px);}
+.rc{transform:rotateY(90deg) translateZ(26px);} .lc{transform:rotateY(-90deg) translateZ(26px);}
+.tc{transform:rotateX(90deg) translateZ(26px);} .btc{transform:rotateX(-90deg) translateZ(26px);}
+@keyframes spinCube{0%{transform:rotateX(12deg) rotateY(0);}100%{transform:rotateX(12deg) rotateY(360deg);}}
+
+.header-text{}
+.logo{font-family:'DM Serif Display',Georgia,serif;font-style:italic;font-size:2rem;line-height:1;color:var(--ink);}
+.logo em{font-style:normal;color:var(--sage);}
+.slogan{font-size:0.64rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-dim);font-weight:500;margin-top:6px;}
+
+/* view 切换 */
+.view-section{animation:fadeIn 0.35s ease both;}
+.view-hidden{display:none!important;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+.section-rule{display:flex;align-items:center;gap:10px;margin:28px 0 18px;}
+.section-rule::before,.section-rule::after{content:'';flex:1;height:1px;background:var(--border);}
+.section-rule span{font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-dim);font-weight:500;white-space:nowrap;}
+
+.submenu-head{display:flex;align-items:center;gap:14px;margin:24px 0 16px;}
+.btn-back{
+    background:transparent;border:1px solid var(--border-md);
+    padding:5px 14px;border-radius:2px;
+    color:var(--sage);cursor:pointer;font-size:0.7rem;font-weight:500;
+    font-family:'Sora',sans-serif;letter-spacing:0.04em;
+    transition:all 0.2s ease;
+}
+.btn-back:hover{background:rgba(61,92,58,0.06);border-color:var(--sage-line);}
+.submenu-title{font-size:0.78rem;font-weight:500;color:var(--ink-mid);letter-spacing:0.04em;}
+
+/* 游戏列表 */
+.game-list{display:flex;flex-direction:column;}
+.game-item{
+    display:flex;align-items:center;gap:16px;
+    padding:14px 0;
+    text-decoration:none;color:var(--ink-mid);
+    border-bottom:1px solid var(--border);
+    transition:color 0.22s,padding-left 0.22s;
+    position:relative; cursor:pointer;
+}
+.game-item:first-child{border-top:1px solid var(--border);}
+.game-item::before{
+    content:'';position:absolute;left:-1px;top:18%;bottom:18%;
+    width:2px;background:linear-gradient(to bottom,var(--gold),var(--sage));
+    transform:scaleY(0);transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);
+    transform-origin:center;border-radius:2px;
+}
+/* 只在真正有鼠标的设备上响应 hover，防止手机触摸后残留 hover 状态 */
+@media(hover:hover){
+    .game-item:hover{color:var(--ink);padding-left:4px;}
+    .game-item:hover::before{transform:scaleY(1);}
+    .game-item:hover .item-arr{opacity:1;transform:translateX(0);}
+    .btn-back:hover{background:rgba(61,92,58,0.06);border-color:var(--sage-line);}
+}
+.game-item:active{color:var(--ink);background:rgba(28,30,24,0.03);}
+
+.item-icon{
+    width:34px;height:34px;border-radius:2px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    font-size:0.78rem;font-weight:700;font-family:'Sora',sans-serif;
+    letter-spacing:-0.5px;
+}
+.ic-green{background:rgba(61,92,58,0.08);color:var(--sage);}
+.ic-blue {background:rgba(37,99,235,0.07);color:#1d4ed8;}
+.ic-amber{background:rgba(180,83,9,0.07); color:#b45309;}
+.ic-vio  {background:rgba(109,40,217,0.07);color:#7c3aed;}
+.ic-gold {background:rgba(138,111,58,0.09);color:var(--gold);}
+.ic-teal {background:rgba(15,118,110,0.07);color:#0f766e;}
+.ic-code {font-family:Consolas,Monaco,monospace;font-size:0.72rem;}
+
+.item-info{flex:1;}
+.item-info h3{font-size:0.86rem;font-weight:500;margin-bottom:2px;}
+.item-info p{font-size:0.65rem;color:var(--ink-dim);}
+.tag{font-size:0.58rem;background:rgba(61,92,58,0.1);padding:1px 5px;border-radius:2px;color:var(--sage);font-weight:600;vertical-align:middle;margin-left:4px;}
+.item-arr{font-size:0.58rem;color:var(--gold);opacity:0;transform:translateX(-4px);transition:opacity 0.22s,transform 0.22s;flex-shrink:0;}
+
+.footer{margin-top:30px;font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-dim);opacity:0.55;text-align:center;}
+
+@media screen and (orientation:portrait){
+    .header-main{flex-direction:column;gap:16px;margin-bottom:4px;}
+    .logo{font-size:1.7rem;}
+}
+@media screen and (orientation:landscape){
+    body{padding:20px;}
+    .nav-back{max-width:820px;}
+    .card{max-width:820px;padding:40px 48px 36px;}
+    .header-main{flex-direction:row;justify-content:center;gap:32px;margin-bottom:4px;}
+    .big-cube,.big-cube div{width:42px;height:42px;}
+    .fc{transform:translateZ(21px);} .bc{transform:rotateY(180deg) translateZ(21px);}
+    .rc{transform:rotateY(90deg) translateZ(21px);} .lc{transform:rotateY(-90deg) translateZ(21px);}
+    .tc{transform:rotateX(90deg) translateZ(21px);} .btc{transform:rotateX(-90deg) translateZ(21px);}
+    .section-rule{margin:20px 0 14px;}
+    .game-list{display:grid;grid-template-columns:1fr 1fr;gap:0 40px;}
+    .game-item:nth-child(odd):first-child,.game-item:nth-child(even)+.game-item{border-top:1px solid var(--border);}
+    .submenu-head{margin-top:16px;}
+    @media(max-height:500px){.card{padding:24px 44px 22px;}.logo{font-size:1.5rem;}}
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="grain"></div>
+
+<div class="nav-back"><a href="../index.html">← 返回主站</a> &nbsp;/&nbsp; 游乐空间</div>
+
+<div class="card">
+    <div class="header-main">
+        <div class="cube-wrap">
+            <div class="big-cube">
+                <div class="fc"></div><div class="bc"></div><div class="rc"></div>
+                <div class="lc"></div><div class="tc"></div><div class="btc"></div>
+            </div>
+        </div>
+        <div class="header-text">
+            <div class="logo">Daum <em>Playground</em></div>
+            <p class="slogan">个人休闲空间</p>
+        </div>
+    </div>
+
+    <div id="view-cat" class="view-section">
+        <div class="section-rule"><span>选择分类</span></div>
+        <div class="game-list">
+            <div id="btn-html" class="game-item">
+                <div class="item-icon ic-blue ic-code">&lt;/&gt;</div>
+                <div class="item-info"><h3>HTML 小游戏</h3><p>网页经典 · 休闲合集</p></div>
+                <span class="item-arr">→</span>
+            </div>
+            <a href="sb.html" class="game-item">
+                <div class="item-icon ic-teal">Cy</div>
+                <div class="item-info"><h3>赛博小玩意</h3><p>奇趣交互 · 视觉实验</p></div>
+                <span class="item-arr">→</span>
+            </a>
+        </div>
+    </div>
+
+    <div id="view-html" class="view-section view-hidden">
+        <div class="submenu-head">
+            <button id="btn-back" class="btn-back">← 返回</button>
+            <span class="submenu-title">HTML 小游戏合集</span>
+        </div>
+        <div class="game-list">
+            <a href="game1.html" class="game-item">
+                <div class="item-icon ic-green">Mm</div>
+                <div class="item-info"><h3>记忆翻牌</h3><p>休闲益智 · 脑力训练</p></div>
+                <span class="item-arr">→</span>
+            </a>
+            <a href="game2.html" class="game-item">
+                <div class="item-icon ic-blue">Sp</div>
+                <div class="item-info"><h3>蜘蛛纸牌</h3><p>经典策略 · 永不过时</p></div>
+                <span class="item-arr">→</span>
+            </a>
+            <a href="game3.html" class="game-item">
+                <div class="item-icon ic-amber">M2</div>
+                <div class="item-info"><h3>扫雷 <span class="tag">2D</span></h3><p>流畅动效 · 极致解压</p></div>
+                <span class="item-arr">→</span>
+            </a>
+            <a href="game4.html" class="game-item">
+                <div class="item-icon ic-vio">M3</div>
+                <div class="item-info"><h3>扫雷 <span class="tag">3D</span></h3><p>三维逻辑 · 空间挑战</p></div>
+                <span class="item-arr">→</span>
+            </a>
+            <a href="2048.html" class="game-item">
+                <div class="item-icon ic-gold">48</div>
+                <div class="item-info"><h3>2048</h3><p>数字合成 · 根本停不下来</p></div>
+                <span class="item-arr">→</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="footer">&copy; 2026 &nbsp;·&nbsp; Designed by Daum</div>
+</div>
+
+<script>
+document.getElementById('btn-html').addEventListener('click',()=>{
+    document.getElementById('view-cat').classList.add('view-hidden');
+    document.getElementById('view-html').classList.remove('view-hidden');
+});
+document.getElementById('btn-back').addEventListener('click',()=>{
+    document.getElementById('view-html').classList.add('view-hidden');
+    document.getElementById('view-cat').classList.remove('view-hidden');
+});
+</script>
+</body>
+</html>

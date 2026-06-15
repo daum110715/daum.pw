@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>蜘蛛纸牌</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css" />
+  <link rel="stylesheet" href="spider.css?v=2" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">蜘蛛纸牌</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">分数</span><span id="stat-score">500</span></span>
+      <span class="stat"><span class="stat-label">移动</span><span id="stat-moves">0</span></span>
+      <span class="stat"><span class="stat-label">时间</span><span id="stat-time">0:00</span></span>
+      <span class="stat"><span class="stat-label">已完成</span><span id="stat-done">0</span>/8</span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch">手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <select id="difficulty" title="难度">
+        <option value="1">1 花色</option>
+        <option value="2">2 花色</option>
+        <option value="4" selected>4 花色</option>
+      </select>
+      <label class="solvable-check" title="生成后会用求解器验证是否可通关，可能需要等待 1-3 秒">
+        <input type="checkbox" id="ensure-solvable" />
+        保证可解
+      </label>
+      <button id="btn-hint" title="提示 (H)">提示</button>
+      <button id="btn-undo">撤销</button>
+      <button id="btn-help" title="帮助 (?)" type="button">?</button>
+      <button id="btn-new">新游戏</button>
+    </div>
+  </div>
+
+  <div class="board">
+    <div class="board-top">
+      <div class="foundation" id="foundation"></div>
+      <div class="stock-wrap">
+        <div class="stock" id="stock" title="点击发牌"></div>
+      </div>
+    </div>
+    <div class="tableau" id="tableau"></div>
+  </div>
+
+  <!-- 拖拽浮层挂在 body 上 -->
+  <div id="drag-layer"></div>
+
+  <!-- 提示气泡 -->
+  <div id="toast" class="toast"></div>
+
+  <!-- 加载覆盖层 -->
+  <div id="loading-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title" id="loading-text">正在验证牌局是否可解...</div>
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- 确认覆盖层 -->
+  <div id="confirm-overlay" class="overlay" hidden>
+    <div class="overlay-card confirm-card">
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="confirm-buttons">
+        <button id="confirm-cancel" class="secondary">取消</button>
+        <button id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 胜利覆盖层 -->
+  <div id="win-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">通关！</div>
+      <div class="overlay-stats">
+        <div>分数 <strong id="win-score">0</strong></div>
+        <div>移动 <strong id="win-moves">0</strong></div>
+      </div>
+      <div class="overlay-stats" id="win-stats"></div>
+      <button id="win-new">再来一局</button>
+    </div>
+  </div>
+
+  <!-- 帮助覆盖层 -->
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>目标是<strong>将八组牌按同花色从 K 到 A 依次排列</strong>，完成一组即可移入收牌区。</p>
+          <p>可以将牌按<strong>降序排列</strong>移动到另一列（如黑桃 8 可放到黑桃 9 上）。</p>
+          <p>只有<strong>同花色</strong>的连续降序牌才能作为一整串一起移动。</p>
+          <p>当某列没有牌时，可以放任意一张牌到该列。</p>
+          <p>点击发牌区（左上角）可以给每一列补充一张牌。</p>
+          <p>完成 8 组同花色的 K→A 排列即可通关。</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">快捷键</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>N</kbd><span>新游戏</span></div>
+          <div class="help-row"><kbd>D</kbd><span>发牌</span></div>
+          <div class="help-row"><kbd>H</kbd><span>提示</span></div>
+          <div class="help-row"><kbd>U / Ctrl+Z</kbd><span>撤销</span></div>
+          <div class="help-row"><kbd>?</kbd><span>打开帮助</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗 / 取消拖拽</span></div>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js"></script>
+  <script src="../../scripts/confetti.js"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="solver-core.js"></script>
+  <script src="spider.js?v=3"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

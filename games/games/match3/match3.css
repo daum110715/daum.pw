@@ -1,0 +1,134 @@
+/* ===== Match-3 消消乐 ===== */
+
+.board {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.match3-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(480px, 92vw);
+  height: min(480px, 92vw);
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-glass);
+  border: 2px solid var(--line-hover);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.match3-cell {
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  background: var(--bg-card-face);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.match3-cell:hover {
+  transform: scale(1.05);
+}
+
+.match3-cell.selected {
+  box-shadow: 0 0 0 3px var(--accent);
+  z-index: 2;
+  transform: scale(1.05);
+}
+
+.match3-cell.matched {
+  animation: matchShrink 0.35s ease forwards;
+}
+
+@keyframes matchShrink {
+  to {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+.match3-cell.falling {
+  animation: fallIn 0.3s ease forwards;
+}
+
+@keyframes fallIn {
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 宝石：6 种颜色，纯 CSS 形状 */
+.gem {
+  width: 68%;
+  height: 68%;
+  border-radius: 35%;
+  position: relative;
+}
+
+.gem::after {
+  content: "";
+  position: absolute;
+  top: 12%;
+  left: 12%;
+  width: 35%;
+  height: 35%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.gem-type-0 {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+.gem-type-1 {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+}
+.gem-type-2 {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+}
+.gem-type-3 {
+  background: linear-gradient(135deg, #f1c40f, #f39c12);
+}
+.gem-type-4 {
+  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+}
+.gem-type-5 {
+  background: linear-gradient(135deg, #e67e22, #d35400);
+}
+
+/* 提示无合法交换 */
+.no-moves-hint {
+  text-align: center;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .match3-board {
+    width: min(380px, 96vw);
+    height: min(380px, 96vw);
+  }
+}
+
+@media (max-width: 400px) {
+  .match3-board {
+    width: min(300px, 98vw);
+    height: min(300px, 98vw);
+    gap: 3px;
+    padding: 3px;
+  }
+}

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数独</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css?v=2" />
+  <link rel="stylesheet" href="sudoku.css?v=1" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">数独</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">难度</span><span id="stat-difficulty">中等</span></span>
+      <span class="stat"><span class="stat-label">步数</span><span id="stat-moves">0</span></span>
+      <span class="stat"><span class="stat-label">用时</span><span id="stat-time">0:00</span></span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch">手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <select id="difficulty" title="难度">
+        <option value="easy">简单</option>
+        <option value="medium" selected>中等</option>
+        <option value="hard">困难</option>
+      </select>
+      <button id="btn-new" type="button">新游戏</button>
+      <button id="btn-undo" type="button" title="撤销 (U / Ctrl+Z)">撤销</button>
+      <button id="btn-hint" type="button" title="提示 (H)">提示</button>
+      <button id="btn-note" type="button" title="笔记模式 (N)">笔记</button>
+      <button id="btn-help" type="button" title="帮助 (?)">?</button>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div class="numpad">
+      <button class="num-btn" id="num-1">1</button>
+      <button class="num-btn" id="num-2">2</button>
+      <button class="num-btn" id="num-3">3</button>
+      <button class="num-btn" id="num-4">4</button>
+      <button class="num-btn" id="num-5">5</button>
+      <button class="num-btn" id="num-6">6</button>
+      <button class="num-btn" id="num-7">7</button>
+      <button class="num-btn" id="num-8">8</button>
+      <button class="num-btn" id="num-9">9</button>
+      <button class="num-btn wide" id="num-clear">删除</button>
+    </div>
+  </div>
+
+  <div id="confirm-overlay" class="overlay" hidden>
+    <div class="overlay-card confirm-card">
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="confirm-buttons">
+        <button id="confirm-cancel" class="secondary">取消</button>
+        <button id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">正在生成数独...</div>
+      <div class="loading-spinner"></div>
+    </div>
+  </div>
+
+  <div id="win-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">通关！</div>
+      <div class="overlay-stats">
+        <div>难度 <strong id="win-difficulty">中等</strong></div>
+        <div>步数 <strong id="win-moves">0</strong></div>
+        <div>用时 <strong id="win-time">0:00</strong></div>
+      </div>
+      <div class="overlay-stats" id="win-stats"></div>
+      <button id="win-new">再来一局</button>
+    </div>
+  </div>
+
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>在 9×9 的网格中填入数字 <strong>1-9</strong>，满足以下条件：</p>
+          <p>• 每一<strong>行</strong>必须包含 1-9 且不重复</p>
+          <p>• 每一<strong>列</strong>必须包含 1-9 且不重复</p>
+          <p>• 每一个 <strong>3×3 宫格</strong>必须包含 1-9 且不重复</p>
+          <p>灰色数字是题目给定的，不可修改。</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">操作方式</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>鼠标点击</kbd><span>选中格子</span></div>
+          <div class="help-row"><kbd>1-9</kbd><span>输入数字</span></div>
+          <div class="help-row"><kbd>Backspace / Delete</kbd><span>清除当前格</span></div>
+          <div class="help-row"><kbd>方向键</kbd><span>移动选中的格子</span></div>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">快捷键</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>N</kbd><span>切换笔记模式</span></div>
+          <div class="help-row"><kbd>H</kbd><span>提示（填入正确答案）</span></div>
+          <div class="help-row"><kbd>U / Ctrl+Z</kbd><span>撤销</span></div>
+          <div class="help-row"><kbd>R</kbd><span>新游戏</span></div>
+          <div class="help-row"><kbd>?</kbd><span>打开帮助</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗</span></div>
+        </div>
+      </div>
+      <div style="margin-top:20px">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js?v=2"></script>
+  <script src="../../scripts/confetti.js?v=2"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="sudoku.js?v=2"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

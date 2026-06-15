@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>2048 - Color Flow Edition</title>
+    <style>
+        :root {
+            /* 基础浅色系背景 */
+            --bg-body: #f8fbff;
+            --bg-board: #ffffff;
+            --bg-cell: #edf2f7;
+            --text-dark: #2d3748;
+            
+            /* 核心尺寸 */
+            --grid-gap: 12px;
+            --board-padding: 12px;
+            --board-size: min(90vw, 400px);
+            --cell-size: calc((var(--board-size) - (var(--board-padding) * 2) - (var(--grid-gap) * 3)) / 4);
+        }
+
+        body {
+            margin: 0; height: 100vh; background: var(--bg-body);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; touch-action: none; user-select: none;
+        }
+
+        /* --- UI 头部 --- */
+        .header { width: var(--board-size); display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 25px; z-index: 50; }
+        h1 { font-size: 44px; margin: 0; color: var(--text-dark); letter-spacing: -2.5px; }
+        
+        .score-box {
+            position: relative; background: #fff; padding: 6px 30px; border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06); text-align: center; border: 1px solid rgba(0,0,0,0.03);
+        }
+        .score-title { font-size: 10px; color: #888; letter-spacing: 1px; font-weight: bold; }
+        .score-val { font-size: 26px; font-weight: bold; color: var(--text-dark); }
+
+        /* --- 棋盘容器 --- */
+        .board-wrapper {
+            position: relative; padding: 4px; border-radius: 20px;
+            /* 棋盘流光边框动画 */
+            background: linear-gradient(90deg, #a1c4fd, #c2e9fb, #d4fc79, #84fab0, #a1c4fd);
+            background-size: 200%; animation: flowBg 10s linear infinite;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+        }
+        @keyframes flowBg { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+
+        .game-board {
+            position: relative; width: var(--board-size); height: var(--board-size);
+            background: var(--bg-board); border-radius: 16px; padding: var(--board-padding); box-sizing: border-box;
+        }
+
+        .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: var(--grid-gap); width: 100%; height: 100%; }
+        .grid-cell { background: var(--bg-cell); border-radius: 10px; }
+
+        /* --- 方块层 (核心：超平滑渐变) --- */
+        .tile-layer { position: absolute; inset: var(--board-padding); pointer-events: none; z-index: 10; }
+        .tile {
+            position: absolute; width: var(--cell-size); height: var(--cell-size); border-radius: 10px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 36px; font-weight: 800; color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+            /* 利用定位 */
+            transform: translate(calc(var(--x) * (var(--cell-size) + var(--grid-gap))), calc(var(--y) * (var(--cell-size) + var(--grid-gap))));
+            transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 150ms ease, box-shadow 150ms ease; will-change: transform;
+            
+            box-shadow: 0 4px 12px var(--glow-color); /* 方块发光 */
+        }
+
+        /* --- 粒子层 (方块之上) --- */
+        .particle-layer { position: absolute; inset: var(--board-padding); pointer-events: none; z-index: 20; overflow: hidden; border-radius: 16px; }
+        .particle {
+            position: absolute; width: 6px; height: 6px; border-radius: 50%;
+            background-color: var(--color); box-shadow: 0 0 8px var(--color);
+            animation: explode 0.6s ease-out forwards;
+        }
+        @keyframes explode { 
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; }
+        }
+
+        /* --- 特效层 (最上层) --- */
+        .fx-layer { position: absolute; inset: var(--board-padding); pointer-events: none; z-index: 30; }
+        
+        /* 合成冲击波光晕 */
+        .fx-halo {
+            position: absolute; width: var(--cell-size); height: var(--cell-size); border-radius: 10px;
+            transform: translate(calc(var(--x) * (var(--cell-size) + var(--grid-gap))), calc(var(--y) * (var(--cell-size) + var(--grid-gap))));
+            box-shadow: 0 0 0 0 var(--color), 0 0 20px 10px rgba(255,255,255,0.5);
+            opacity: 0; animation: fxHalo 0.4s ease-out forwards;
+        }
+        @keyframes fxHalo {
+            0% { box-shadow: 0 0 0 0 var(--color), 0 0 20px 10px rgba(255,255,255,0.8); opacity: 1; }
+            100% { box-shadow: 0 0 50px 30px var(--color), 0 0 20px 10px rgba(255,255,255,0); opacity: 0; }
+        }
+
+        /* --- 动画类 --- */
+        .tile-new { animation: appear 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes appear { 0% { opacity: 0; scale: 0; } 100% { opacity: 1; scale: 1; } }
+
+        /* 修复后的合成特效 (Glitched Q弹 + 亮度闪烁) */
+        .tile-merged { z-index: 15; animation: mergeBounce 0.3s ease-out forwards, fxShine 0.3s ease-out forwards; }
+        
+        /* 1. Glitched Q弹动画 */
+        @keyframes mergeBounce {
+            0%   { scale: 0.9; }
+            30%  { scale: 1.15; }
+            60%  { scale: 0.95; }
+            100% { scale: 1; }
+        }
+        
+        /* 2. 流光掠影效果 (作为动画的一部分) */
+        @keyframes fxShine {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.3); } /* 瞬间变亮 */
+            100% { filter: brightness(1); }
+        }
+
+        /* Try Again */
+        .overlay {
+            position: absolute; inset: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+            z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: 0.3s; border-radius: 16px;
+        }
+        .overlay.show { opacity: 1; pointer-events: auto; }
+        .btn-restart {
+            padding: 12px 35px; border: none; border-radius: 50px;
+            background: linear-gradient(90deg, #a1c4fd, #c2e9fb); color: #fff; 
+            font-weight: bold; font-size: 18px; cursor: pointer; margin-top: 20px;
+            box-shadow: 0 5px 15px rgba(161, 196, 253, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>2048</h1>
+    <div class="score-box">
+        <div class="score-title">SCORE</div>
+        <div class="score-val" id="score">0</div>
+    </div>
+</div>
+
+<div class="board-wrapper">
+    <div class="game-board" id="board">
+        <div class="grid-bg">
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        </div>
+        
+        <div class="tile-layer" id="tile-layer"></div>
+        <div class="particle-layer" id="particle-layer"></div>
+        <div class="fx-layer" id="fx-layer"></div>
+        
+        <div class="overlay" id="overlay">
+            <h2 style="font-size:36px; color:#2d3748; margin:0;">Game Over</h2>
+            <button class="btn-restart" onclick="game.restart()">Try Again</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 核心逻辑：修复版 + 真实色彩过渡 + 合成流光冲击波特效
+ */
+
+// 真实色彩平滑过渡函数
+function getInterpolatedColor(value) {
+    // 摒弃固定颜色表，使用数学对数计算色彩在彩虹光谱上的位置
+    // 数字每翻一倍，色彩只会移动极小的一步，实现无缝平滑过渡
+    
+    // 基础 HSL (色相、饱和度、亮度)
+    // 色相 Hue (0-360) 代表光谱：红橙黄绿青蓝紫红
+    // 2-2048 对应的色相范围大概在 180 (青色) 到 360 (红色) 之间循环
+    
+    // 对数缩放：让颜色在低数值移动快，高数值移动慢
+    let logValue = Math.log2(value); // 2->1, 4->2, 1024->10, 2048->11 ...
+    
+    // 色相计算公式：起点色相 + 对数步长 * 因子
+    // 这个公式让颜色从青色开始，顺着光谱移动
+    let hue = (180 + logValue * 22) % 360; 
+    
+    // 数字越大，饱和度越高，亮度稍微降低，增加质感
+    let sat = 60 + Math.min(logValue * 2, 35); // 60% - 95%
+    let light = 70 - Math.min(logValue, 15);   // 70% - 55%
+
+    let color = `hsl(${hue}, ${sat}%, ${light}%)`;
+    let glow = `hsl(${hue}, ${sat}%, ${light + 10}%, 0.3)`; // 稍微亮一点用于发光
+    
+    return { color, glow };
+}
+
+class Tile {
+    constructor(container, x, y, value) {
+        this.x = x; this.y = y; this.value = value;
+        this.el = document.createElement("div");
+        this.el.className = `tile tile-new`;
+        this.updateData();
+        this.updatePosition();
+        container.appendChild(this.el);
+    }
+
+    updatePosition() {
+        this.el.style.setProperty("--x", this.x);
+        this.el.style.setProperty("--y", this.y);
+    }
+
+    updateData() {
+        this.el.innerText = this.value;
+        const { color, glow } = getInterpolatedColor(this.value);
+        this.el.style.backgroundColor = color;
+        this.el.style.setProperty("--glow-color", glow);
+        
+        // 动态调整字体大小适配大数字
+        let fontSize = 36;
+        if (this.value >= 100) fontSize = 30;
+        if (this.value >= 1000) fontSize = 24;
+        this.el.style.fontSize = fontSize + 'px';
+    }
+
+    upgrade(newVal) {
+        this.value = newVal;
+        this.updateData();
+        // 覆盖 new 动画，强制触发合成特效动效
+        this.el.classList.remove("tile-new");
+        this.el.classList.add("tile-merged");
+        
+        // 粒子容器会自动清理，不需要在这里操作
+    }
+
+    remove() { this.el.remove(); }
+}
+
+class Game {
+    constructor() {
+        this.size = 4;
+        this.cells = [];
+        this.score = 0;
+        this.tileLayer = document.getElementById("tile-layer");
+        this.particleLayer = document.getElementById("particle-layer");
+        this.fxLayer = document.getElementById("fx-layer");
+        this.scoreEl = document.getElementById("score");
+        this.overlay = document.getElementById("overlay");
+        this.boardEl = document.getElementById("board");
+
+        this.initInput();
+        this.restart();
+    }
+
+    restart() {
+        this.tileLayer.innerHTML = '';
+        this.particleLayer.innerHTML = '';
+        this.fxLayer.innerHTML = '';
+        this.cells = Array(this.size).fill(null).map(()=>Array(this.size).fill(null));
+        this.score = 0;
+        this.scoreEl.innerText = 0;
+        this.overlay.classList.remove('show');
+        this.addTile(); this.addTile();
+    }
+
+    updateScore(val) {
+        this.scoreEl.innerText = val;
+        // 分数跳动动画
+        if(val > 0) {
+            this.scoreEl.animate([ { transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' } ], { duration: 150 });
+        }
+    }
+
+    addTile() {
+        let empty = [];
+        for(let y=0; y<this.size; y++) for(let x=0; x<this.size; x++) if(!this.cells[y][x]) empty.push({x,y});
+        if(empty.length) {
+            let {x, y} = empty[Math.floor(Math.random()*empty.length)];
+            this.cells[y][x] = new Tile(this.tileLayer, x, y, Math.random()<0.9?2:4);
+        }
+    }
+
+    // --- 粒子特效与冲击波光晕 ---
+    spawnMergeEffects(x, y, value) {
+        const { color } = getInterpolatedColor(value);
+
+        const rect = this.boardEl.getBoundingClientRect();
+        const gap = 12; const padding = 12;
+        const cellSize = (rect.width - padding*2 - gap*3)/4;
+        const centerX = x * (cellSize + gap) + cellSize/2;
+        const centerY = y * (cellSize + gap) + cellSize/2;
+
+        // 1. 触发冲击波光晕 (Shockwave Halo)
+        const halo = document.createElement('div');
+        halo.className = 'fx-halo';
+        halo.style.setProperty("--x", x);
+        halo.style.setProperty("--y", y);
+        halo.style.setProperty("--color", color);
+        this.fxLayer.appendChild(halo);
+        // 动画结束后自动清理
+        halo.addEventListener('animationend', () => halo.remove());
+
+        // 2. 炸出更闪烁的粒子 (Particles)
+        for(let i=0; i<10; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = centerX + 'px';
+            p.style.top = centerY + 'px';
+            p.style.setProperty("--color", color);
+
+            const angle = Math.random() * Math.PI * 2;
+            const dist = cellSize * (0.6 + Math.random() * 0.4); // 爆炸半径
+            const tx = Math.cos(angle) * dist;
+            const ty = Math.sin(angle) * dist;
+
+            p.style.setProperty("--tx", `${tx}px`);
+            p.style.setProperty("--ty", `${ty}px`);
+
+            this.particleLayer.appendChild(p);
+            p.addEventListener('animationend', () => p.remove());
+        }
+    }
+
+    move(dir) {
+        const vector = [{x:0,y:-1}, {x:1,y:0}, {x:0,y:1}, {x:-1,y:0}][dir];
+        let moved = false;
+        let traversalsX = [0,1,2,3], traversalsY = [0,1,2,3];
+        if(vector.x===1) traversalsX.reverse();
+        if(vector.y===1) traversalsY.reverse();
+
+        let merged = Array(this.size).fill(null).map(()=>Array(this.size).fill(false));
+        let tilesToRemove = [];
+
+        traversalsX.forEach(x => {
+            traversalsY.forEach(y => {
+                let cell = this.cells[y][x];
+                if(cell) {
+                    let farthest = {x, y};
+                    let next = {x: x+vector.x, y: y+vector.y};
+                    while(next.x>=0 && next.x<this.size && next.y>=0 && next.y<this.size && !this.cells[next.y][next.x]) {
+                        farthest = next; next = {x: next.x+vector.x, y: next.y+vector.y};
+                    }
+                    let nextCell = (next.x>=0 && next.x<this.size && next.y>=0 && next.y<this.size) ? this.cells[next.y][next.x] : null;
+
+                    if(nextCell && nextCell.value === cell.value && !merged[next.y][next.x]) {
+                        // 合并成功
+                        cell.x = next.x; cell.y = next.y; cell.updatePosition();
+                        merged[next.y][next.x] = true;
+                        let newVal = cell.value * 2;
+                        this.score += newVal; this.updateScore(this.score);
+
+                        tilesToRemove.push(cell); tilesToRemove.push(nextCell);
+                        
+                        let newTile = new Tile(this.tileLayer, next.x, next.y, newVal);
+                        newTile.el.classList.add("tile-merged"); // 合并果冻Q弹效果
+                        this.cells[next.y][next.x] = newTile;
+                        this.cells[y][x] = null;
+                        
+                        // 冲击波爆发！
+                        this.spawnMergeEffects(next.x, next.y, newVal);
+                        moved = true;
+                    } else if(farthest.x !== x || farthest.y !== y) {
+                        // 移动
+                        this.cells[farthest.y][farthest.x] = cell;
+                        this.cells[y][x] = null;
+                        cell.x = farthest.x; cell.y = farthest.y; cell.updatePosition();
+                        moved = true;
+                    }
+                }
+            });
+        });
+
+        if(moved) {
+            setTimeout(() => {
+                tilesToRemove.forEach(t => t.remove());
+                this.addTile();
+                if(!this.canMove()) this.overlay.classList.add('show');
+            }, 150);
+        }
+    }
+
+    canMove() {
+        for(let y=0; y<this.size; y++) for(let x=0; x<this.size; x++) {
+            if(!this.cells[y][x]) return true;
+            if(x<3 && this.cells[y][x].value === this.cells[y][x+1].value) return true;
+            if(y<3 && this.cells[y][x].value === this.cells[y+1][x].value) return true;
+        }
+        return false;
+    }
+
+    initInput() {
+        document.addEventListener('keydown', e => {
+            const map = {ArrowUp:0, ArrowRight:1, ArrowDown:2, ArrowLeft:3};
+            if(map[e.key]!==undefined) { e.preventDefault(); this.move(map[e.key]); }
+        });
+        let sx, sy;
+        this.boardEl.addEventListener('touchstart', e => { sx=e.touches[0].clientX; sy=e.touches[0].clientY; e.preventDefault(); }, {passive:false});
+        this.boardEl.addEventListener('touchend', e => {
+            if(!e.changedTouches.length) return;
+            let dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+            if(Math.max(Math.abs(dx), Math.abs(dy)) > 30) {
+                if(Math.abs(dx)>Math.abs(dy)) this.move(dx>0?1:3); else this.move(dy>0?2:0);
+            }
+        }, {passive:false});
+    }
+}
+const game = new Game();
+</script>
+</body>
+</html>

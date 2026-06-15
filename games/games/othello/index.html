@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>黑白棋</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css?v=2" />
+  <link rel="stylesheet" href="othello.css?v=1" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">黑白棋</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">黑子</span><span id="stat-black">2</span></span>
+      <span class="stat"><span class="stat-label">白子</span><span id="stat-white">2</span></span>
+      <span class="stat"><span class="stat-label">回合</span><span id="stat-turn">黑棋</span></span>
+      <span class="stat"><span class="stat-label">步数</span><span id="stat-moves">0</span></span>
+      <span class="stat"><span class="stat-label">用时</span><span id="stat-time">0:00</span></span>
+      <span class="stat"><span class="stat-label">模式</span><span id="stat-mode">双人</span></span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch" selected>手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <select id="mode-select" title="游戏模式">
+        <option value="pvp" selected>双人对战</option>
+        <option value="ai">人机对战</option>
+      </select>
+      <select id="ai-level" title="AI 难度">
+        <option value="easy">简单</option>
+        <option value="medium" selected>中等</option>
+        <option value="hard">困难</option>
+      </select>
+      <button id="btn-undo" type="button" title="撤销 (U / Ctrl+Z)">撤销</button>
+      <button id="btn-help" type="button" title="帮助 (?)">?</button>
+      <button id="btn-new" type="button">新游戏</button>
+    </div>
+  </div>
+
+  <main class="page">
+    <section class="game-shell">
+      <div class="stats-section">
+        <section class="stats-panel">
+          <div class="panel-head">
+            <div>
+              <h2>对局数据</h2>
+              <div class="panel-subtitle">本地记录，按当前浏览器保存</div>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stats-item">
+              <span class="stats-label">开局</span>
+              <strong id="stats-started">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">黑胜</span>
+              <strong id="stats-black-wins">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">白胜</span>
+              <strong id="stats-white-wins">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">和局</span>
+              <strong id="stats-draws">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">胜率(黑)</span>
+              <strong id="stats-black-rate">0%</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">胜率(白)</span>
+              <strong id="stats-white-rate">0%</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-panel recent-panel">
+          <div class="panel-head">
+            <div>
+              <h2>近期战绩</h2>
+              <div class="panel-subtitle">只记录已结束的对局</div>
+            </div>
+          </div>
+          <div class="recent-list" id="recent-list">
+            <div class="recent-empty">暂无记录</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board" id="board" aria-label="黑白棋棋盘"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="win-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title" id="win-title">游戏结束</div>
+      <div class="overlay-stats">
+        <div>黑子 <strong id="win-black">2</strong></div>
+        <div>白子 <strong id="win-white">2</strong></div>
+        <div>步数 <strong id="win-moves">0</strong></div>
+        <div>用时 <strong id="win-time">0:00</strong></div>
+      </div>
+      <div class="overlay-stats" id="win-stats"></div>
+      <div class="overlay-actions">
+        <button id="win-new" type="button">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-overlay" class="overlay" hidden>
+    <div class="overlay-card confirm-card">
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="confirm-buttons">
+        <button id="confirm-cancel" class="secondary">取消</button>
+        <button id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>8×8 棋盘，开局中心 2×2 交叉放置两黑两白。</p>
+          <p>每步必须在横、竖、斜方向上<strong>夹住</strong>对方至少一枚棋子，被夹住的棋子会翻转为己方颜色。</p>
+          <p>若一方无合法步，则跳过该回合。双方都无法走棋时游戏结束。</p>
+          <p>棋盘上棋子多者获胜。</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">操作方式</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>鼠标点击</kbd><span>落子</span></div>
+          <div class="help-row"><kbd>R</kbd><span>新游戏</span></div>
+          <div class="help-row"><kbd>U / Ctrl+Z</kbd><span>撤销</span></div>
+          <div class="help-row"><kbd>?</kbd><span>打开帮助</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗</span></div>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js?v=2"></script>
+  <script src="../../scripts/confetti.js?v=2"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="othello.js?v=1"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

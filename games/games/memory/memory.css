@@ -1,0 +1,124 @@
+/* ===== Memory 记忆翻牌 ===== */
+
+.board {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.memory-grid {
+  display: grid;
+  gap: 8px;
+  justify-content: center;
+  perspective: 1500px;
+}
+
+.memory-grid.easy   { grid-template-columns: repeat(4, 1fr); }
+.memory-grid.medium { grid-template-columns: repeat(5, 1fr); }
+.memory-grid.hard   { grid-template-columns: repeat(6, 1fr); }
+
+/* 卡牌容器：直接在此做 3D 翻转 */
+.memory-card {
+  aspect-ratio: 1;
+  width: 80px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.memory-card.flipped { transform: rotateY(180deg); }
+
+/* 正反面 */
+.memory-card-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.memory-card-back {
+  background: var(--bg-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: var(--border-width) var(--border-style) var(--line);
+  box-shadow: var(--shadow-button);
+}
+
+.memory-card-back::after {
+  content: "?";
+  font-weight: 600;
+  font-size: 20px;
+  opacity: 0.4;
+  color: var(--muted);
+}
+
+.memory-card-front {
+  background: var(--bg-glass-hover);
+  transform: rotateY(180deg);
+  border: var(--border-width) var(--border-style) var(--line);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+/* SVG 形状 */
+.memory-shape-svg {
+  width: 70%;
+  height: 70%;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+/* 配对成功：弹跳 + 边框高亮 */
+.memory-card.celebrate {
+  animation: matchPop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.memory-card.celebrate .memory-card-front {
+  border-color: var(--good);
+  box-shadow: 0 0 0 3px var(--good), var(--shadow-game-card);
+}
+@keyframes matchPop {
+  0%, 100% { transform: rotateY(180deg) scale(1); }
+  50% { transform: rotateY(180deg) scale(1.15); }
+}
+
+/* 配对成功：缩小淡出 */
+.memory-card.matched {
+  opacity: 0;
+  transform: rotateY(180deg) scale(0.5);
+  pointer-events: none;
+  transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* 锁定 / 已匹配 */
+.memory-card.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* 粒子 */
+.memory-particle {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .memory-card { width: 64px; }
+  .memory-grid { gap: 6px; }
+}
+
+@media (max-width: 400px) {
+  .memory-card { width: 52px; }
+  .memory-grid { gap: 5px; }
+}

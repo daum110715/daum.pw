@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>扫雷</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css?v=5" />
+  <link rel="stylesheet" href="minesweeper.css?v=13" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">扫雷</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">剩余</span><span id="stat-mines">10</span></span>
+      <span class="stat"><span class="stat-label">步数</span><span id="stat-moves">0</span></span>
+      <span class="stat"><span class="stat-label">用时</span><span id="stat-time">0:00</span></span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch">手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <select id="difficulty" title="难度">
+        <option value="beginner">初级 9×9</option>
+        <option value="intermediate">中级 16×16</option>
+        <option value="expert">高级 30×16</option>
+        <option value="custom">自定义</option>
+      </select>
+      <button id="btn-hint" type="button" title="提示 (H)">提示</button>
+      <button id="btn-undo" type="button" title="撤销 (Ctrl+Z)">撤销</button>
+      <button id="btn-keyboard" type="button" title="K 切换 | 开启后可用方向键/WASD操控">按键模式</button>
+      <button id="btn-help" type="button" title="快捷键说明">?</button>
+      <button id="btn-new" type="button">新游戏</button>
+    </div>
+  </div>
+
+  <main class="page">
+    <section class="game-shell">
+      <div class="stats-section">
+        <section class="stats-panel">
+          <div class="panel-head">
+            <div>
+              <h2>对局数据</h2>
+              <div class="panel-subtitle">本地记录，按当前浏览器保存</div>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stats-item">
+              <span class="stats-label">开局</span>
+              <strong id="stats-started">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">胜利</span>
+              <strong id="stats-won">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">胜率</span>
+              <strong id="stats-win-rate">0%</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">初级最佳</span>
+              <strong id="stats-best-beginner">-</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">中级最佳</span>
+              <strong id="stats-best-intermediate">-</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">高级最佳</span>
+              <strong id="stats-best-expert">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-panel recent-panel">
+          <div class="panel-head">
+            <div>
+              <h2>近期战绩</h2>
+              <div class="panel-subtitle">只记录已结束的对局</div>
+            </div>
+          </div>
+          <div class="recent-list" id="recent-list"></div>
+        </section>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board" id="board"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 胜利/失败弹窗 -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title" id="overlay-title"></div>
+      <div class="overlay-scoreline" id="overlay-scoreline"></div>
+      <div class="overlay-actions">
+        <button id="overlay-undo" type="button" hidden>撤销一步</button>
+        <a class="overlay-link" href="../../index.html">返回首页</a>
+        <button id="overlay-new" type="button">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认弹窗 -->
+  <div class="overlay" id="confirm-overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">确认操作</div>
+      <div class="overlay-scoreline">当前对局尚未结束，确定要开始新游戏吗？</div>
+      <div class="overlay-actions">
+        <button id="confirm-cancel" type="button">取消</button>
+        <button id="confirm-ok" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自定义难度弹窗 -->
+  <div class="overlay" id="custom-overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">自定义难度</div>
+      <div class="custom-fields">
+        <label class="custom-field">
+          <span>宽度（列）</span>
+          <input type="number" id="custom-cols" min="5" max="50" value="16">
+        </label>
+        <label class="custom-field">
+          <span>高度（行）</span>
+          <input type="number" id="custom-rows" min="5" max="30" value="16">
+        </label>
+        <label class="custom-field">
+          <span>雷数</span>
+          <input type="number" id="custom-mines" min="1" value="40">
+        </label>
+      </div>
+      <div class="overlay-scoreline" id="custom-hint">宽 5~50 · 高 5~30 · 雷数不超过格数减 1</div>
+      <div class="overlay-actions">
+        <button id="custom-cancel" type="button">取消</button>
+        <button id="custom-ok" type="button">开始游戏</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>棋盘上隐藏着若干雷，你的目标是找出所有安全的格子。</p>
+          <p>点击格子揭开它。如果揭开的是数字，表示周围 8 格中有几颗雷。</p>
+          <p>右键点击格子可标旗 🚩（确认有雷）或标记问号 ❓（不确定）。再次右键循环切换。</p>
+          <p>在已揭开的数字格子上<strong>双击</strong>，或同时按下<strong>左右键</strong>，如果周围已标记的旗帜数等于该数字，会自动揭开周围剩余的格子（Chord 操作）。</p>
+          <p>踩到雷则游戏结束；找出所有雷即可胜利。</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">快捷键</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>K</kbd><span>切换按键模式</span></div>
+          <div class="help-row"><kbd>方向键 / WASD</kbd><span>移动焦点（需开启按键模式）</span></div>
+          <div class="help-row"><kbd>空格</kbd><span>揭开当前格子</span></div>
+          <div class="help-row"><kbd>Enter</kbd><span>双击揭开周围（Chord）</span></div>
+          <div class="help-row"><kbd>F</kbd><span>标旗 / 问号</span></div>
+          <div class="help-row"><kbd>H</kbd><span>提示</span></div>
+          <div class="help-row"><kbd>U / Ctrl+Z</kbd><span>撤销一步</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗</span></div>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js"></script>
+  <script src="../../scripts/confetti.js"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="minesweeper.js?v=14"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

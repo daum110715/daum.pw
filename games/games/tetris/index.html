@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>俄罗斯方块</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css?v=2" />
+  <link rel="stylesheet" href="tetris.css?v=2" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">俄罗斯方块</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">分数</span><span id="stat-score">0</span></span>
+      <span class="stat"><span class="stat-label">行数</span><span id="stat-lines">0</span></span>
+      <span class="stat"><span class="stat-label">等级</span><span id="stat-level">1</span></span>
+      <span class="stat"><span class="stat-label">最佳</span><span id="stat-high">0</span></span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch">手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <button id="btn-pause" type="button">暂停</button>
+      <button id="btn-help" type="button" title="帮助 (?)">?</button>
+      <button id="btn-new" type="button">新游戏</button>
+    </div>
+  </div>
+
+  <main class="page">
+    <section class="game-shell">
+      <div class="game-area">
+        <div class="board-wrap">
+          <div class="board" id="board"></div>
+          <div id="start-overlay" class="start-overlay">
+            <button id="start-btn" type="button">点击开始游戏</button>
+            <div class="start-hint">或按空格 / 方向键</div>
+          </div>
+          <div id="pause-overlay" class="board-pause" hidden>
+            <div class="board-pause-card">
+              <div class="board-pause-title">已暂停</div>
+              <button id="pause-resume" type="button">继续</button>
+            </div>
+          </div>
+        </div>
+        <div class="side-panel">
+          <div class="panel-box hold-box">
+            <div class="panel-label">暂存</div>
+            <div class="mini-board" id="hold-board"></div>
+          </div>
+          <div class="panel-box next-box">
+            <div class="panel-label">下一个</div>
+            <div class="next-list" id="next-list"></div>
+          </div>
+          <div class="panel-box controls-hint">
+            <div class="panel-label">操作</div>
+            <div class="hint-row"><kbd>&#8592; &#8594;</kbd><span>左右移动</span></div>
+            <div class="hint-row"><kbd>&#8593;</kbd><span>旋转</span></div>
+            <div class="hint-row"><kbd>&#8595;</kbd><span>软降</span></div>
+            <div class="hint-row"><kbd>空格</kbd><span>硬降</span></div>
+            <div class="hint-row"><kbd>H / C</kbd><span>暂存</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <section class="stats-panel">
+          <div class="panel-head">
+            <div>
+              <h2>对局数据</h2>
+              <div class="panel-subtitle">近 50 场游戏统计</div>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stats-item">
+              <span class="stats-label">总游戏次数</span>
+              <strong id="stats-started">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">最高得分</span>
+              <strong id="stats-best-score">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">最高等级</span>
+              <strong id="stats-best-level">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">平均得分</span>
+              <strong id="stats-avg-score">0</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">最久存活</span>
+              <strong id="stats-longest">0s</strong>
+            </div>
+            <div class="stats-item">
+              <span class="stats-label">总消除行数</span>
+              <strong id="stats-total-lines">0</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="stats-panel recent-panel">
+          <div class="panel-head">
+            <div>
+              <h2>近期战绩</h2>
+              <div class="panel-subtitle">最近 10 场对局记录</div>
+            </div>
+          </div>
+          <div class="recent-list" id="recent-list">
+            <div class="recent-empty">暂无记录</div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="gameover-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">游戏结束</div>
+      <div class="overlay-stats">
+        <div>最终得分 <strong id="final-score">0</strong></div>
+        <div>消除行数 <strong id="final-lines">0</strong></div>
+        <div>等级 <strong id="final-level">1</strong></div>
+      </div>
+      <div class="overlay-actions">
+        <button id="overlay-new" type="button">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>方块从顶部落下，左右移动、旋转使其填满整行，填满的行会被消除得分。</p>
+          <p>每消除 10 行升一级，下落速度加快。</p>
+          <p>方块堆积到顶部则游戏结束。</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">操作方式</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>方向键 / WASD</kbd><span>移动与旋转</span></div>
+          <div class="help-row"><kbd>空格</kbd><span>硬降（瞬间落底）</span></div>
+          <div class="help-row"><kbd>H / C</kbd><span>暂存方块</span></div>
+          <div class="help-row"><kbd>P</kbd><span>暂停/继续</span></div>
+          <div class="help-row"><kbd>R</kbd><span>新游戏</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗</span></div>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js?v=2"></script>
+  <script src="../../scripts/confetti.js?v=2"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="tetris.js?v=2"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

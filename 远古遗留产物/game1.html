@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D 记忆配对：多维幻彩版</title>
+    <style>
+        :root {
+            --c1: #fdfcfb; --c2: #eee1f5; --c3: #e0f2f1; --c4: #fff9db;
+            --glass: rgba(255, 255, 255, 0.4);
+            --card-front: #ffffff;
+            --text-color: #475569;
+            --flip-speed: 0.3s;
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
+            --cols: 6; /* 动态变量 */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            width: 100vw; height: 100vh; margin: 0;
+            background: linear-gradient(-45deg, var(--c1), var(--c2), var(--c3), var(--c4));
+            background-size: 400% 400%;
+            animation: meshFlow 20s ease infinite;
+            display: flex; flex-direction: column; align-items: center; padding: 15px; color: var(--text-color); overflow: hidden;
+        }
+
+        @keyframes meshFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        .game-header {
+            width: 100%; max-width: 600px; display: flex; justify-content: space-around;
+            background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            padding: 12px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03); border: 1px solid rgba(255, 255, 255, 0.6); margin-bottom: 15px;
+        }
+        .stat-box { text-align: center; }
+        .stat-label { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase; }
+        .stat-value { font-size: 18px; font-weight: 700; color: #1e293b; }
+
+        .game-container {
+            width: 100%; max-width: 600px; display: grid;
+            grid-template-columns: repeat(var(--cols), 1fr);
+            gap: 8px; perspective: 1500px;
+        }
+
+        .card { aspect-ratio: 1; position: relative; transform-style: preserve-3d; transition: transform var(--flip-speed) var(--ease), opacity 0.4s ease; cursor: pointer; }
+        .card.flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 8px; display: flex; justify-content: center; align-items: center; }
+        .card-back { background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: inset 0 0 8px rgba(255,255,255,0.2); }
+        .card-front { background: var(--card-front); transform: rotateY(180deg); box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+
+        /* 处理奇数网格中间的空缺 */
+        .card.empty { visibility: hidden; pointer-events: none; cursor: default; }
+
+        .card.celebrate { animation: matchPop 0.4s var(--ease); }
+        @keyframes matchPop { 0%, 100% { transform: rotateY(180deg) scale(1); } 50% { transform: rotateY(180deg) scale(1.15); } }
+
+        .shape-svg { width: 70%; height: 70%; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
+        .particle { position: absolute; width: 6px; height: 6px; border-radius: 1px; pointer-events: none; z-index: 100; }
+        .card.matched { opacity: 0; transform: rotateY(180deg) scale(0); pointer-events: none; transition: all 0.4s ease-in; }
+
+        /* 初始/结算 弹窗 */
+        .modal {
+            position: fixed; inset: 0; background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; transition: opacity 0.3s;
+        }
+        .modal.hidden { opacity: 0; pointer-events: none; }
+        .modal-content {
+            background: rgba(255, 255, 255, 0.8); padding: 40px; border-radius: 32px; text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.05); border: 1px solid #fff; width: 90%; max-width: 450px;
+        }
+
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+        .choice-btn {
+            background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 18px; cursor: pointer; transition: all 0.2s;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
+        .choice-btn:hover { background: #f8fafc; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+        .choice-btn span:first-child { font-size: 18px; font-weight: 800; color: #1e293b; }
+        .choice-btn span:last-child { font-size: 12px; color: #94a3b8; }
+
+        .restart-btn { margin-top: 20px; background: #1e293b; color: #fff; border: none; padding: 12px 40px; border-radius: 14px; font-weight: 600; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="game-header">
+        <div class="stat-box"><div class="stat-label">TIME</div><div class="stat-value" id="t">0</div></div>
+        <div class="stat-box"><div class="stat-label">MOVES</div><div class="stat-value" id="m">0</div></div>
+        <div class="stat-box"><div class="stat-label">LEFT</div><div class="stat-value" id="l">0</div></div>
+    </div>
+
+    <div class="game-container" id="g"></div>
+
+    <div class="modal" id="start-menu">
+        <div class="modal-content">
+            <h2 style="font-size: 24px; color: #1e293b;">选择难度</h2>
+            <p style="font-size: 14px; color: #94a3b8; margin-top: 5px;">奇数网格中间将留空</p>
+            <div class="menu-grid">
+                <div class="choice-btn" onclick="startGame(3)"><span>3 x 3</span><span>4 对卡片</span></div>
+                <div class="choice-btn" onclick="startGame(4)"><span>4 x 4</span><span>8 对卡片</span></div>
+                <div class="choice-btn" onclick="startGame(5)"><span>5 x 5</span><span>12 对卡片</span></div>
+                <div class="choice-btn" onclick="startGame(6)"><span>6 x 6</span><span>18 对卡片</span></div>
+                <div class="choice-btn" onclick="startGame(7)"><span>7 x 7</span><span>24 对卡片</span></div>
+                <div class="choice-btn" onclick="startGame(8)"><span>8 x 8</span><span>32 对卡片</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal hidden" id="win">
+        <div class="modal-content">
+            <h2 style="font-size: 28px;">太棒了！ ✨</h2>
+            <p id="final-stats" style="margin-top: 10px; color: #64748b;"></p>
+            <button class="restart-btn" onclick="showMenu()">返回菜单</button>
+        </div>
+    </div>
+
+<script>
+    // 扩展到50个唯一几何路径 (保持不变)
+    const PATHS = [
+        "M50 15 L85 80 L15 80 Z","M20 20 H80 V80 H20 Z","M50 10 A40 40 0 1 1 49.9 10 Z","M50 15 L61 40 L85 40 L66 58 L72 85 L50 70 L28 85 L34 58 L15 40 L39 40 Z",
+        "M20 50 Q20 20 50 20 T80 50 T50 80 T20 50","M50 20 L80 40 V60 L50 80 L20 60 V40 Z","M30 20 L70 20 L80 80 L20 80 Z","M50 15 C20 15 20 50 50 85 C80 50 80 15 50 15",
+        "M20 20 L50 30 L80 20 L70 50 L80 80 L50 70 L20 80 L30 50 Z","M15 15 L85 15 L50 50 L85 85 L15 85 L50 50 Z","M50 10 L90 30 L90 70 L50 90 L10 70 L10 30 Z",
+        "M20 30 Q50 10 80 30 L80 70 Q50 90 20 70 Z","M50 10 L65 35 H85 L70 55 L80 85 L50 70 L20 85 L30 55 L15 35 H35 Z","M20 20 Q80 20 80 80 Q20 80 20 20",
+        "M30 20 H70 A10 10 0 0 1 70 80 H30 A10 10 0 0 1 30 20","M50 10 L80 80 H20 Z M50 30 L70 70 H30 Z","M20 50 L50 20 L80 50 L50 80 Z","M10 10 H40 V40 H10 Z M60 60 H90 V90 H60 Z",
+        "M50 10 L20 80 H80 Z M50 30 L35 70 H65 Z","M20 20 L80 80 M80 20 L20 80","M10 50 L50 10 L90 50 L50 90 Z","M30 30 H70 V70 H30 Z M45 45 H55 V55 H45 Z",
+        "M20 30 Q50 60 80 30","M50 10 V90 M10 50 H90","M20 20 L50 50 L80 20","M10 10 L90 90","M50 10 L60 40 H90 L65 60 L75 90 L50 70 L25 90 L35 60 L10 40 H40 Z",
+        "M15 15 L85 85 M15 85 L85 15","M30 20 C10 20 10 50 30 50 H70 C90 50 90 20 70 20 Z","M50 20 L80 50 L50 80 L20 50 Z","M20 20 H45 V45 H20 Z M55 55 H80 V80 H55 Z",
+        "M10 50 A40 40 0 1 0 90 50 A40 40 0 1 0 10 50 M30 50 A20 20 0 1 0 70 50 A20 20 0 1 0 30 50","M20 20 Q50 0 80 20 Q100 50 80 80 Q50 100 20 80 Q0 50 20 20",
+        "M50 5 L95 50 L50 95 L5 50 Z","M30 30 L70 30 L50 70 Z","M10 10 H90 V20 H10 Z M10 80 H90 V90 H10 Z","M20 20 V80 M80 20 V80 M20 50 H80",
+        "M15 50 Q50 10 85 50 Q50 90 15 50","M50 10 L90 80 H10 Z","M30 10 H70 L90 90 H10 Z","M10 10 L50 50 L90 10 L90 90 L50 50 L10 90 Z",
+        "M50 10 L60 40 L90 40 L65 60 L75 90 L50 75 L25 90 L35 60 L10 40 L40 40 Z","M10 10 L40 40 M60 60 L90 90","M20 50 H80","M50 10 V90",
+        "M20 20 L80 20 L50 80 Z","M50 20 A30 30 0 1 0 50 80 A30 30 0 1 0 50 20","M20 20 H80 V40 H20 Z M20 60 H80 V80 H20 Z",
+        "M10 10 L30 10 V90 H10 Z M70 10 H90 V90 H70 Z","M10 45 H90 V55 H10 Z","M45 10 H55 V90 H45 Z"
+    ];
+
+    const COLORS = Array.from({length: 50}, (_, i) => {
+        const h1 = (i * 137) % 360;
+        const h2 = (h1 + 40) % 360;
+        return [`hsl(${h1}, 80%, 75%)`, `hsl(${h2}, 80%, 65%)`];
+    });
+
+    let first = null, second = null, lock = false, moves = 0, matches = 0, time = 0, timer = null, currentPairs = 0;
+
+    function showMenu() {
+        document.getElementById('win').classList.add('hidden');
+        document.getElementById('start-menu').classList.remove('hidden');
+    }
+
+    function startGame(gridSize) {
+        document.getElementById('start-menu').classList.add('hidden');
+        document.documentElement.style.setProperty('--cols', gridSize);
+        init(gridSize);
+    }
+
+    function init(size) {
+        const g = document.getElementById('g'); g.innerHTML = '';
+        moves = matches = time = 0; first = second = null; lock = false;
+        
+        // 计算卡片数量，如果是奇数网格（如3x3=9），则减去1作为有效卡片数
+        const totalCells = size * size;
+        const isOdd = totalCells % 2 !== 0;
+        currentPairs = Math.floor(totalCells / 2);
+        
+        document.getElementById('m').innerText = '0';
+        document.getElementById('l').innerText = currentPairs;
+        document.getElementById('t').innerText = '0';
+        clearInterval(timer);
+
+        // 生成配对数据
+        let data = [];
+        for(let i=0; i < currentPairs; i++) {
+            data.push({id: i, p: PATHS[i], c: COLORS[i]});
+            data.push({id: i, p: PATHS[i], c: COLORS[i]});
+        }
+        data.sort(() => Math.random() - 0.5);
+
+        // 如果是奇数网格，在正中间插入一个空位
+        if (isOdd) {
+            const centerIndex = Math.floor(totalCells / 2);
+            data.splice(centerIndex, 0, null); // null 代表空位
+        }
+
+        data.forEach((item, idx) => {
+            const card = document.createElement('div');
+            
+            // 如果是空位
+            if (!item) {
+                card.className = 'card empty';
+                g.appendChild(card);
+                return;
+            }
+
+            // 正常卡片
+            card.className = 'card'; card.dataset.id = item.id;
+            const gradId = `g-${idx}-${Math.random().toString(36).substr(2, 5)}`; 
+            card.innerHTML = `
+                <div class="card-face card-front">
+                    <svg viewBox="0 0 100 100" class="shape-svg">
+                        <defs><linearGradient id="${gradId}"><stop offset="0%" stop-color="${item.c[0]}"/><stop offset="100%" stop-color="${item.c[1]}"/></linearGradient></defs>
+                        <path d="${item.p}" fill="url(#${gradId})" />
+                    </svg>
+                </div>
+                <div class="card-face card-back"></div>
+            `;
+            card.onclick = () => flip(card);
+            g.appendChild(card);
+        });
+        timer = setInterval(() => { time++; document.getElementById('t').innerText = time; }, 1000);
+    }
+
+    function burst(x, y, color) {
+        for (let i = 0; i < 20; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle'; p.style.backgroundColor = color;
+            p.style.left = x + 'px'; p.style.top = y + 'px';
+            p.style.boxShadow = `0 0 10px ${color}`; document.body.appendChild(p);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 80 + Math.random() * 60;
+            p.animate([{ transform: 'translate(0,0) scale(2)', opacity: 1 }, { transform: `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px) scale(0)`, opacity: 0 }], { duration: 800, easing: 'ease-out' }).onfinish = () => p.remove();
+        }
+    }
+
+    async function flip(card) {
+        if (lock || card === first || card.classList.contains('flipped')) return;
+        card.classList.add('flipped');
+        if (!first) { first = card; return; }
+        second = card; lock = true; moves++;
+        document.getElementById('m').innerText = moves;
+
+        await new Promise(r => setTimeout(r, 350));
+
+        if (first.dataset.id === second.dataset.id) {
+            first.classList.add('celebrate'); second.classList.add('celebrate');
+            [first, second].forEach(c => {
+                const r = c.getBoundingClientRect();
+                burst(r.left + r.width/2, r.top + r.height/2, COLORS[c.dataset.id][0]);
+            });
+            await new Promise(r => setTimeout(r, 450));
+            [first, second].forEach(c => c.classList.add('matched'));
+            matches++;
+            document.getElementById('l').innerText = currentPairs - matches;
+            if (matches === currentPairs) {
+                clearInterval(timer);
+                setTimeout(() => {
+                    document.getElementById('final-stats').innerText = `耗时：${time}秒 | 步数：${moves}`;
+                    document.getElementById('win').classList.remove('hidden');
+                }, 600);
+            }
+            first = second = null; lock = false;
+        } else {
+            setTimeout(() => { first.classList.remove('flipped'); second.classList.remove('flipped'); first = second = null; lock = false; }, 400);
+        }
+    }
+</script>
+</body>
+</html>

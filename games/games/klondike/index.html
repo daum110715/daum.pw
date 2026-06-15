@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="sketch">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>纸牌</title>
+  <link rel="manifest" href="../../manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="../../icon.svg" />
+  <meta name="theme-color" content="#5b6d8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="../../styles/common.css?v=2" />
+  <link rel="stylesheet" href="klondike.css?v=1" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a class="back-link" href="../../index.html">&#8592; 返回</a>
+      <span class="game-name">纸牌</span>
+    </div>
+    <div class="topbar-stats">
+      <span class="stat"><span class="stat-label">分数</span><span id="stat-score">0</span></span>
+      <span class="stat"><span class="stat-label">移动</span><span id="stat-moves">0</span></span>
+      <span class="stat"><span class="stat-label">用时</span><span id="stat-time">0:00</span></span>
+    </div>
+    <div class="topbar-right">
+      <div class="theme-switcher">
+        <select id="theme-switcher" title="切换主题">
+          <option value="dark">暗夜黑晶</option>
+          <option value="flat">扁平多彩</option>
+          <option value="neumorphism">新拟态</option>
+          <option value="cyberpunk">赛博朋克</option>
+          <option value="terminal">复古终端</option>
+          <option value="material">Material You</option>
+          <option value="vaporwave">蒸汽波</option>
+          <option value="sketch">手绘温暖</option>
+          <option value="clay">黏土</option>
+          <option value="brutalist">粗野主义</option>
+          <option value="pixel">像素</option>
+          <option value="editorial">杂志</option>
+          <option value="swiss">瑞士</option>
+          <option value="bento">便当盒</option>
+          <option value="noir">黑色电影</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="bauhaus">包豪斯</option>
+          <option value="synthwave">合成器波</option>
+        </select>
+      </div>
+      <select id="deal-mode" title="发牌模式">
+        <option value="1">翻 1 张</option>
+        <option value="3" selected>翻 3 张</option>
+      </select>
+      <button id="btn-auto" type="button" title="自动收集 (A)">自动收集</button>
+      <button id="btn-undo" type="button" title="撤销 (U / Ctrl+Z)">撤销</button>
+      <button id="btn-help" type="button" title="帮助 (?)">?</button>
+      <button id="btn-new" type="button">新游戏</button>
+    </div>
+  </div>
+
+  <div class="board">
+    <div class="board-top">
+      <div class="top-left">
+        <div class="stock-wrap">
+          <div class="stock" id="stock" title="点击翻牌"></div>
+        </div>
+        <div class="waste-wrap">
+          <div class="waste" id="waste"></div>
+        </div>
+      </div>
+      <div class="foundation" id="foundation">
+        <div class="found-slot" data-pile="0"></div>
+        <div class="found-slot" data-pile="1"></div>
+        <div class="found-slot" data-pile="2"></div>
+        <div class="found-slot" data-pile="3"></div>
+      </div>
+    </div>
+    <div class="tableau" id="tableau"></div>
+  </div>
+
+  <div id="drag-layer"></div>
+  <div id="toast" class="toast"></div>
+
+  <div id="confirm-overlay" class="overlay" hidden>
+    <div class="overlay-card confirm-card">
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="confirm-buttons">
+        <button id="confirm-cancel" class="secondary">取消</button>
+        <button id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="win-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">通关！</div>
+      <div class="overlay-stats">
+        <div>分数 <strong id="win-score">0</strong></div>
+        <div>移动 <strong id="win-moves">0</strong></div>
+        <div>用时 <strong id="win-time">0:00</strong></div>
+      </div>
+      <div class="overlay-stats" id="win-stats"></div>
+      <button id="win-new">再来一局</button>
+    </div>
+  </div>
+
+  <div id="help-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-title">帮助</div>
+      <div class="help-section">
+        <div class="help-section-title">游戏规则</div>
+        <div class="help-rules">
+          <p>目标是将<strong>四种花色的牌按 A→K 的顺序分别收集到右上角的四个基台</strong>中。</p>
+          <p>点击左上角牌库翻开牌，翻开的牌进入废牌堆，废牌堆最上面一张可用。</p>
+          <p>工作区（下方7列）中，牌必须按<strong>降序且颜色交替</strong>排列（如黑桃 8 可放到红桃 9 上）。</p>
+          <p>空列只能放 K 或从 K 开始的降序序列。</p>
+          <p>A 可以放到空的基台中，后续同花色按 2、3…K 顺序叠放。</p>
+          <p><strong>双击</strong>一张牌，如果它可以被自动收集到基台，将会自动移动。</p>
+        </div>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">快捷键</div>
+        <div class="help-content">
+          <div class="help-row"><kbd>D / 空格</kbd><span>翻牌</span></div>
+          <div class="help-row"><kbd>A</kbd><span>自动收集可移入基台的牌</span></div>
+          <div class="help-row"><kbd>U / Ctrl+Z</kbd><span>撤销</span></div>
+          <div class="help-row"><kbd>N</kbd><span>新游戏</span></div>
+          <div class="help-row"><kbd>H</kbd><span>提示</span></div>
+          <div class="help-row"><kbd>?</kbd><span>打开帮助</span></div>
+          <div class="help-row"><kbd>ESC</kbd><span>关闭弹窗 / 取消拖拽</span></div>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="help-close" type="button">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts/theme.js?v=2"></script>
+  <script src="../../scripts/confetti.js?v=2"></script>
+  <script src="../../scripts/game-common.js?v=1"></script>
+  <script src="klondike.js?v=2"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('../../sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>
