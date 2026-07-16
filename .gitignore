@@ -2,3 +2,8 @@
 .vscode/
 node_modules/
 .env
+
+# Vite build output
+dist/
+dist-ssr/
+*.local

@@ -1,0 +1,276 @@
+/* ==========================================================
+   Neumorphism Design System - daum.pw v2
+   同色表面 + 双向阴影(左上亮 / 右下暗 = 凸起;内阴影 = 按下)
+   ========================================================== */
+
+/* ---------- Design Tokens ---------- */
+:root {
+  --font-display: 'Outfit', 'Noto Sans SC', sans-serif;
+  --font-body: 'Noto Sans SC', 'Outfit', sans-serif;
+
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  --dur: 0.35s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --maxw: 1120px;
+  --pad: clamp(20px, 5vw, 48px);
+  --section-gap: clamp(64px, 10vw, 120px);
+
+  /* 新拟态阴影距离/模糊 */
+  --dist: 6px;
+  --blur: 14px;
+  --dist-lg: 9px;
+  --blur-lg: 22px;
+}
+
+/* ---------- Light theme (default) ---------- */
+:root,
+[data-theme='light'] {
+  --bg: #e9e6df;
+  --bg-2: #efece5;
+  --text: #3a3a3a;
+  --text-dim: #6a6760; /* 加深至 WCAG AA 4.5:1(原 #8a8780 仅 ~2.9:1) */
+  --accent: #f5b842; /* 亮金:仅用于填充/图标/边框,不作浅底文字 */
+  --accent-2: #e8723a;
+  --accent-text: #8a5a14; /* 深琥珀:用于浅底上的强调文字(~6:1) */
+  --accent-soft: rgba(245, 184, 66, 0.16);
+  --shadow-light: #ffffff;
+  --shadow-dark: #c5c1b8;
+  --ring: rgba(245, 184, 66, 0.5);
+  color-scheme: light;
+}
+
+/* ---------- Dark theme ---------- */
+[data-theme='dark'] {
+  --bg: #2b2e35;
+  --bg-2: #31343c;
+  --text: #e8e8ec;
+  --text-dim: #9a9aa3;
+  --accent: #f5b842;
+  --accent-2: #e8723a;
+  --accent-text: #f5b842; /* 暗底上亮金可读,与 accent 同 */
+  --accent-soft: rgba(245, 184, 66, 0.14);
+  --shadow-light: #363a42;
+  --shadow-dark: #21242b;
+  --ring: rgba(245, 184, 66, 0.55);
+  color-scheme: dark;
+}
+
+/* ---------- Reset ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 92px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  background-image: radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
+  background-attachment: fixed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+ul {
+  list-style: none;
+}
+
+/* scrollbar */
+html::-webkit-scrollbar {
+  width: 10px;
+}
+html::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+html::-webkit-scrollbar-thumb {
+  background: var(--shadow-dark);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg);
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* ---------- Typography ---------- */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Layout ---------- */
+.container {
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+.section {
+  padding: clamp(56px, 9vw, 96px) 0;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: clamp(28px, 5vw, 44px);
+}
+.section-head.center {
+  justify-content: center;
+  text-align: center;
+}
+.section-tag {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--accent-text);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.section-title {
+  font-size: clamp(1.4rem, 3.6vw, 2rem);
+}
+.section-sub {
+  color: var(--text-dim);
+  margin-top: 10px;
+  max-width: 56ch;
+  font-size: 0.96rem;
+}
+.section-head.center .section-sub {
+  margin-inline: auto;
+}
+
+/* ---------- Neumorphism surface utilities ---------- */
+.neu {
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow:
+    calc(var(--dist) * -1) calc(var(--dist) * -1) var(--blur) var(--shadow-light),
+    var(--dist) var(--dist) var(--blur) var(--shadow-dark);
+  transition:
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.neu-lg {
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    calc(var(--dist-lg) * -1) calc(var(--dist-lg) * -1) var(--blur-lg) var(--shadow-light),
+    var(--dist-lg) var(--dist-lg) var(--blur-lg) var(--shadow-dark);
+  transition:
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.neu-inset {
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow:
+    inset calc(var(--dist) * -1) calc(var(--dist) * -1) var(--blur) var(--shadow-light),
+    inset var(--dist) var(--dist) var(--blur) var(--shadow-dark);
+}
+
+.neu-hover:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    calc(var(--dist-lg) * -1) calc(var(--dist-lg) * -1) var(--blur-lg) var(--shadow-light),
+    var(--dist-lg) var(--dist-lg) var(--blur-lg) var(--shadow-dark);
+}
+.neu-press:active {
+  transform: scale(0.98);
+  box-shadow:
+    inset calc(var(--dist) * -1) calc(var(--dist) * -1) var(--blur) var(--shadow-light),
+    inset var(--dist) var(--dist) var(--blur) var(--shadow-dark);
+}
+
+/* ---------- Reveal animation ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.6s var(--ease),
+    transform 0.6s var(--ease);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Helpers ---------- */
+.text-dim {
+  color: var(--text-dim);
+}
+.accent {
+  color: var(--accent-text);
+}
+.mono {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+.grad-text {
+  background: linear-gradient(135deg, var(--accent-text), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

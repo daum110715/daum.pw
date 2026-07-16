@@ -1,0 +1,19 @@
+{
+  "name": "daum-pw-homepage",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "daum12569 的数字客厅 — 新拟态个人主页",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.21"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.0"
+  }
+}
