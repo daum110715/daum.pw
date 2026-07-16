@@ -1,5 +1,5 @@
 <template>
-  <section id="now" class="section">
+  <section id="now" class="section" aria-label="Now">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">●</span>

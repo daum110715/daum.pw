@@ -1,5 +1,5 @@
 <template>
-  <section id="contact" class="section">
+  <section id="contact" class="section" aria-label="找到我">
     <div class="container contact-wrap">
       <header class="section-head center reveal">
         <span class="section-tag">@</span>

@@ -1,5 +1,5 @@
 <template>
-  <section id="hero" class="section hero">
+  <section id="hero" class="section hero" aria-label="首页">
     <div class="container hero-inner">
       <div class="hero-badge neu-inset reveal">
         <span class="dot" />

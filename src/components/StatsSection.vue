@@ -1,5 +1,5 @@
 <template>
-  <section id="stats" class="section">
+  <section id="stats" class="section" aria-label="一些数字">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">#</span>

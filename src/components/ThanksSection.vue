@@ -1,5 +1,5 @@
 <template>
-  <section id="thanks" class="section">
+  <section id="thanks" class="section" aria-label="特别感谢与收藏">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">♥</span>

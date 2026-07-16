@@ -1,5 +1,5 @@
 <template>
-  <section id="friends" class="section">
+  <section id="friends" class="section" aria-label="友邻">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">&amp;</span>
@@ -12,7 +12,7 @@
       <div class="friends-grid">
         <a
           v-for="f in friends"
-          :key="f.url"
+          :key="f.name"
           :href="f.url"
           class="friend-card neu neu-hover reveal"
           :target="f.url.startsWith('mailto:') ? undefined : '_blank'"

@@ -1,5 +1,5 @@
 <template>
-  <section id="skills" class="section">
+  <section id="skills" class="section" aria-label="技能与折腾">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">+</span>

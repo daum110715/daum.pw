@@ -1,5 +1,5 @@
 <template>
-  <section id="journey" class="section">
+  <section id="journey" class="section" aria-label="历程">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">-&gt;</span>

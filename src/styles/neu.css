@@ -235,7 +235,8 @@ h4 {
   transform: translateY(26px);
   transition:
     opacity 0.6s var(--ease),
-    transform 0.6s var(--ease);
+    transform 0.6s var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 .reveal.is-visible {
   opacity: 1;

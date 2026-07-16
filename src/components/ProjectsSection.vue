@@ -1,5 +1,5 @@
 <template>
-  <section id="projects" class="section">
+  <section id="projects" class="section" aria-label="做过的小玩意">
     <div class="container">
       <header class="section-head reveal">
         <span class="section-tag">/</span>
