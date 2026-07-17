@@ -30,49 +30,54 @@ onMounted(() => {
   reducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 })
 
-function toggleWithTransition(e) {
+function toggleWithTransition() {
   if (reducedMotion.value) {
     toggle()
     return
   }
 
-  const rect = e.currentTarget.getBoundingClientRect()
-  const x = rect.left + rect.width / 2
-  const y = rect.top + rect.height / 2
   const nextTheme = theme.value === 'dark' ? 'light' : 'dark'
 
-  // 在内容背后做一个从新主题底色扩散的圆形遮罩，内容始终在最上层
+  // 在内容背后做一个斜向平移的遮罩，内容始终在最上层
   const overlay = document.createElement('div')
   overlay.style.cssText = `
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    background: ${nextTheme === 'dark'
-      ? 'radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
-      : 'radial-gradient(circle at 50% -10%, #ffffff, #f4f2ed 55%)'};
-    clip-path: circle(0px at ${x}px ${y}px);
-    transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
   `
+
+  const panel = document.createElement('div')
+  panel.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 250vmax;
+    height: 250vmax;
+    background: ${nextTheme === 'dark'
+      ? 'radial-gradient(circle at 8% 12%, rgba(159, 180, 204, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(216, 164, 127, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(200, 190, 175, 0.14) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
+      : 'radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #fffcfa, #f5f2ec 55%)'};
+    transform: translate(-100%, -100%);
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  `
+  overlay.appendChild(panel)
   document.body.appendChild(overlay)
 
   requestAnimationFrame(() => {
-    const r = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y)
-    )
-    overlay.style.clipPath = `circle(${r}px at ${x}px ${y}px)`
+    panel.style.transform = 'translate(0, 0)'
   })
 
-  // 遮罩扩展到一半时切主题，配合全局 .theme-transition 让内容颜色平滑过渡
+  // 遮罩平移到一半时切主题，配合全局 .theme-transition 让内容颜色平滑过渡
   setTimeout(() => {
     toggle()
-  }, 300)
+  }, 350)
 
-  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true })
+  panel.addEventListener('transitionend', () => overlay.remove(), { once: true })
   setTimeout(() => {
     if (overlay.parentNode) overlay.remove()
-  }, 700)
+  }, 800)
 }
 </script>
 

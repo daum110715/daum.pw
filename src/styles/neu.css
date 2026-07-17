@@ -31,17 +31,17 @@
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
-  --bg: #f4f2ed;
-  --bg-2: #ffffff;
-  --text: #3a3d42;
-  --text-dim: #7c7982;
-  --accent: #8ab4f8; /* 柔和蓝 */
-  --accent-2: #e0a8a8; /* 柔和玫瑰 */
-  --accent-text: #5c7fa3; /* 用于浅底上的强调文字 */
-  --accent-soft: rgba(138, 180, 248, 0.16);
+  --bg: #f5f2ec;
+  --bg-2: #fffcfa;
+  --text: #3a3a3a;
+  --text-dim: #7d7a75;
+  --accent: #9fb4cc; /* 柔和灰蓝 */
+  --accent-2: #d8a47f; /* 柔和桃 */
+  --accent-text: #5c6f7f; /* 用于浅底上的强调文字 */
+  --accent-soft: rgba(159, 180, 204, 0.16);
   --shadow-light: #ffffff;
   --shadow-dark: #d7d4cc;
-  --ring: rgba(138, 180, 248, 0.5);
+  --ring: rgba(159, 180, 204, 0.5);
   color-scheme: light;
 }
 
@@ -85,9 +85,9 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
   background-image:
-    radial-gradient(circle at 8% 12%, rgba(138, 180, 248, 0.18) 0%, transparent 32%),
-    radial-gradient(circle at 92% 8%, rgba(224, 168, 168, 0.16) 0%, transparent 28%),
-    radial-gradient(circle at 50% 95%, rgba(255, 220, 180, 0.14) 0%, transparent 30%),
+    radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%),
+    radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%),
+    radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%),
     radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
   background-attachment: fixed;
 }
