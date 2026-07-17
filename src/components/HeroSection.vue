@@ -168,7 +168,7 @@ onUnmounted(() => timer && clearInterval(timer))
   transition: background var(--dur) var(--ease);
 }
 .sig-next:hover {
-  background: rgba(245, 184, 66, 0.26);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .hero-social {

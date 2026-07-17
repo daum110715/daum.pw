@@ -50,7 +50,7 @@ function toggleWithTransition(e) {
     z-index: 0;
     background: ${nextTheme === 'dark'
       ? 'radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
-      : 'radial-gradient(circle at 50% -10%, #efece5, #e9e6df 55%)'};
+      : 'radial-gradient(circle at 50% -10%, #ffffff, #f4f2ed 55%)'};
     clip-path: circle(0px at ${x}px ${y}px);
     transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   `

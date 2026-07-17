@@ -31,17 +31,17 @@
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
-  --bg: #e9e6df;
-  --bg-2: #efece5;
-  --text: #3a3a3a;
-  --text-dim: #6a6760; /* 加深至 WCAG AA 4.5:1(原 #8a8780 仅 ~2.9:1) */
-  --accent: #f5b842; /* 亮金:仅用于填充/图标/边框,不作浅底文字 */
-  --accent-2: #e8723a;
-  --accent-text: #8a5a14; /* 深琥珀:用于浅底上的强调文字(~6:1) */
-  --accent-soft: rgba(245, 184, 66, 0.16);
+  --bg: #f4f2ed;
+  --bg-2: #ffffff;
+  --text: #3a3d42;
+  --text-dim: #7c7982;
+  --accent: #8ab4f8; /* 柔和蓝 */
+  --accent-2: #e0a8a8; /* 柔和玫瑰 */
+  --accent-text: #5c7fa3; /* 用于浅底上的强调文字 */
+  --accent-soft: rgba(138, 180, 248, 0.16);
   --shadow-light: #ffffff;
-  --shadow-dark: #c5c1b8;
-  --ring: rgba(245, 184, 66, 0.5);
+  --shadow-dark: #d7d4cc;
+  --ring: rgba(138, 180, 248, 0.5);
   color-scheme: light;
 }
 
@@ -84,7 +84,11 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
-  background-image: radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
+  background-image:
+    radial-gradient(circle at 8% 12%, rgba(138, 180, 248, 0.18) 0%, transparent 32%),
+    radial-gradient(circle at 92% 8%, rgba(224, 168, 168, 0.16) 0%, transparent 28%),
+    radial-gradient(circle at 50% 95%, rgba(255, 220, 180, 0.14) 0%, transparent 30%),
+    radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
   background-attachment: fixed;
 }
 
