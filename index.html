@@ -23,10 +23,175 @@
       } catch (e) {}
     })();
   </script>
+
+  <!-- 无 JS 时隐藏 preloader,避免遮挡 noscript 提示 -->
+  <noscript><style>#preloader { display: none !important; }</style></noscript>
+
+  <!-- 首屏加载动画:内联令牌 + 样式,保证 dev/prod 首帧都不闪白屏 -->
+  <style>
+    /* ============================================================
+       首屏加载动画 Preloader
+       令牌与 src/styles/neu.css 同值,此处内联一份最小集:
+       Vite dev 下 neu.css 经 JS 注入、首帧尚未就绪,内联令牌确保
+       首帧即按 <html data-theme> 正确着色,暗色下绝不闪白屏。
+       改 neu.css 令牌时请同步本块。
+       ============================================================ */
+    :root {
+      --font-display: 'Outfit', 'Noto Sans SC', sans-serif;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+      --pad: clamp(20px, 5vw, 48px);
+      --dist: 3px;
+      --blur: 8px;
+      --dist-lg: 5px;
+      --blur-lg: 12px;
+    }
+    :root,
+    [data-theme='light'] {
+      --bg: #f5f2ec;
+      --bg-2: #fffcfa;
+      --text-dim: #7d7a75;
+      --accent: #9fb4cc;
+      --accent-2: #d8a47f;
+      --accent-text: #5c6f7f;
+      --shadow-light: #ffffff;
+      --shadow-dark: #d7d4cc;
+    }
+    [data-theme='dark'] {
+      --bg: #2b2e35;
+      --bg-2: #31343c;
+      --text-dim: #9a9aa3;
+      --accent: #f5b842;
+      --accent-2: #e8723a;
+      --accent-text: #f5b842;
+      --shadow-light: #363a42;
+      --shadow-dark: #21242b;
+    }
+    /* .grad-text 首帧兜底(neu.css 加载前的同值再声明,加载后由 neu.css 接管,值一致无冲突) */
+    .grad-text {
+      background: linear-gradient(135deg, var(--accent-text), var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    #preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      padding: var(--pad);
+      background: var(--bg);
+      background-image: radial-gradient(circle at 50% 26%, var(--bg-2), var(--bg) 72%);
+      transition:
+        opacity 0.45s var(--ease),
+        transform 0.45s var(--ease),
+        visibility 0.45s var(--ease);
+      will-change: opacity, transform;
+    }
+    #preloader.is-done {
+      opacity: 0;
+      transform: scale(1.02);
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .preloader__plate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+      padding: clamp(28px, 6vw, 46px) clamp(34px, 8vw, 60px);
+      border-radius: var(--radius-lg);
+      background: var(--bg-2);
+      box-shadow:
+        var(--dist-lg) var(--dist-lg) var(--blur-lg) var(--shadow-dark),
+        calc(-1 * var(--dist-lg)) calc(-1 * var(--dist-lg)) var(--blur-lg) var(--shadow-light);
+    }
+    .preloader__brand {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(1.75rem, 7vw, 3.2rem);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      white-space: nowrap;
+      opacity: 0;
+      clip-path: inset(0 100% 0 0);
+      animation: pl-wipe 0.9s var(--ease) 0.15s forwards;
+    }
+    @keyframes pl-wipe {
+      to { opacity: 1; clip-path: inset(0 0 0 0); }
+    }
+    .preloader__hint {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      color: var(--text-dim);
+      opacity: 0;
+      animation: pl-fade 0.5s var(--ease) 0.6s forwards;
+    }
+    @keyframes pl-fade {
+      to { opacity: 1; }
+    }
+    .preloader__track {
+      width: min(220px, 60vw);
+      height: 8px;
+      border-radius: var(--radius-full);
+      background: var(--bg);
+      overflow: hidden;
+      box-shadow:
+        inset calc(var(--dist) * 0.6) calc(var(--dist) * 0.6) calc(var(--blur) * 0.6) var(--shadow-dark),
+        inset calc(var(--dist) * -0.6) calc(var(--dist) * -0.6) calc(var(--blur) * 0.6) var(--shadow-light);
+    }
+    .preloader__bar {
+      height: 100%;
+      width: 100%;
+      transform-origin: left center;
+      transform: scaleX(0);
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      animation: pl-bar 1.4s var(--ease) 0.2s forwards;
+    }
+    @keyframes pl-bar {
+      to { transform: scaleX(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #preloader { transition: opacity 0.01ms, transform 0.01ms, visibility 0.01ms; }
+      .preloader__brand { opacity: 1; clip-path: inset(0); animation: none; }
+      .preloader__hint { opacity: 1; animation: none; }
+      .preloader__bar { transform: scaleX(1); animation: none; }
+    }
+  </style>
 </head>
-<body>
+<body aria-busy="true">
+  <!-- 首屏加载动画:Vue 挂载 + 字体就绪后由 main.js 平滑移除;4s 硬兜底防卡死 -->
+  <div id="preloader" role="progressbar" aria-label="正在加载 daum.pw">
+    <div class="preloader__plate">
+      <div class="preloader__brand grad-text" aria-hidden="true">daum12569</div>
+      <p class="preloader__hint">正在进入 daum.pw</p>
+      <div class="preloader__track" aria-hidden="true"><div class="preloader__bar"></div></div>
+    </div>
+  </div>
+
   <div id="app"></div>
   <noscript>本站需要 JavaScript 运行,请启用后访问 daum.pw。</noscript>
   <script type="module" src="/src/main.js"></script>
+  <script>
+    // 兜底:即便模块加载失败,4s 后也强制移除 preloader,防止卡死
+    (function () {
+      window.setTimeout(function () {
+        var el = document.getElementById('preloader');
+        if (el && el.dataset.done !== '1') {
+          el.dataset.done = '1';
+          el.classList.add('is-done');
+          el.setAttribute('aria-hidden', 'true');
+          document.body.setAttribute('aria-busy', 'false');
+          window.setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 550);
+        }
+      }, 4000);
+    })();
+  </script>
 </body>
 </html>
