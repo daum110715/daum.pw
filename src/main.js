@@ -26,7 +26,7 @@ const prefersReduced =
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const fontReady = (document.fonts && document.fonts.ready) || Promise.resolve()
 const cap = prefersReduced ? 600 : 2000
-const minDisplay = prefersReduced ? 0 : 1100 // 最小展示时间,避免回访(字体缓存)时入场动画未完成即淡出
+const minDisplay = prefersReduced ? 0 : 1500 // 最小展示时间,让逐字描边书写动画完成后再淡出
 Promise.all([
   Promise.race([fontReady, new Promise((r) => setTimeout(r, cap))]),
   new Promise((r) => setTimeout(r, minDisplay)),
