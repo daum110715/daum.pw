@@ -38,49 +38,33 @@ function toggleWithTransition() {
 
   const nextTheme = theme.value === 'dark' ? 'light' : 'dark'
 
-  // 在内容背后做一个斜向平移的遮罩，内容始终在最上层
+  // 在内容背后做一条斜向平移的遮罩带，内容始终在最上层
   const overlay = document.createElement('div')
   overlay.style.cssText = `
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    overflow: hidden;
-  `
-
-  const panel = document.createElement('div')
-  // 用 !important 覆盖全局 .theme-transition 对 background 的过渡，避免遮罩背景也渐变
-  panel.style.setProperty(
-    'transition',
-    'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-    'important'
-  )
-  panel.style.cssText += `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 250vmax;
-    height: 250vmax;
     background: ${nextTheme === 'dark'
       ? 'radial-gradient(circle at 8% 12%, rgba(159, 180, 204, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(216, 164, 127, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(200, 190, 175, 0.14) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
       : 'radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #fffcfa, #f5f2ec 55%)'};
-    transform: translate(-100%, -100%);
-    will-change: transform;
+    clip-path: polygon(-15% 0, 0 0, -15% 100%, -30% 100%);
+    transition: clip-path 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: clip-path;
   `
-  overlay.appendChild(panel)
   document.body.appendChild(overlay)
 
   // 按钮滑动与页面颜色同时开始
   toggle()
 
   requestAnimationFrame(() => {
-    panel.style.transform = 'translate(0, 0)'
+    overlay.style.clipPath = 'polygon(100% 0, 115% 0, 100% 100%, 85% 100%)'
   })
 
-  panel.addEventListener('transitionend', () => overlay.remove(), { once: true })
+  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true })
   setTimeout(() => {
     if (overlay.parentNode) overlay.remove()
-  }, 500)
+  }, 550)
 }
 </script>
 
