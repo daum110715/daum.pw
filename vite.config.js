@@ -2,10 +2,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
-// daum.pw 部署在自定义域根路径,base 用 '/'
-// 若仓库实为 xxx.github.io/<repo> 项目页,需改为 '/<repo>/'
+// 相对 base:同时兼容自定义域(daum.pw 根)与项目页(daum110715.github.io/daum.pw/)两种 GitHub Pages 服务路径
 export default defineConfig({
-  base: '/',
+  base: './',
   plugins: [vue()],
   resolve: {
     alias: {
