@@ -38,17 +38,15 @@ function toggleWithTransition() {
 
   const nextTheme = theme.value === 'dark' ? 'light' : 'dark'
 
-  // 在内容背后做一条斜向平移的遮罩带，内容始终在最上层
+  // 在内容背后做一条可见的斜向光带，内容始终在最上层
   const overlay = document.createElement('div')
   overlay.style.cssText = `
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    background: ${nextTheme === 'dark'
-      ? 'radial-gradient(circle at 8% 12%, rgba(159, 180, 204, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(216, 164, 127, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(200, 190, 175, 0.14) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
-      : 'radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #fffcfa, #f5f2ec 55%)'};
-    clip-path: polygon(-15% 0, 0 0, -15% 100%, -30% 100%);
+    backdrop-filter: brightness(1.18) saturate(1.25);
+    clip-path: polygon(-20% 0, 0 0, -20% 100%, -40% 100%);
     transition: clip-path 0.45s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: clip-path;
   `
@@ -58,7 +56,7 @@ function toggleWithTransition() {
   toggle()
 
   requestAnimationFrame(() => {
-    overlay.style.clipPath = 'polygon(100% 0, 115% 0, 100% 100%, 85% 100%)'
+    overlay.style.clipPath = 'polygon(100% 0, 120% 0, 120% 100%, 100% 100%)'
   })
 
   overlay.addEventListener('transitionend', () => overlay.remove(), { once: true })
