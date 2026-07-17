@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 
 const STORAGE_KEY = 'daum-theme'
-const TRANSITION_DURATION = 600
+const TRANSITION_DURATION = 450
 
 // 全局共享主题状态(模块单例)
 const theme = ref('light')

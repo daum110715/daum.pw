@@ -103,14 +103,14 @@ html.theme-transition *,
 html.theme-transition *::before,
 html.theme-transition *::after {
   transition:
-    background-color 0.45s var(--ease),
-    background-image 0.45s var(--ease),
-    color 0.45s var(--ease),
-    border-color 0.45s var(--ease),
-    fill 0.45s var(--ease),
-    stroke 0.45s var(--ease),
-    transform 0.45s var(--ease),
-    opacity 0.45s var(--ease) !important;
+    background-color 0.4s var(--ease),
+    background-image 0.4s var(--ease),
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease),
+    fill 0.4s var(--ease),
+    stroke 0.4s var(--ease),
+    transform 0.4s var(--ease),
+    opacity 0.4s var(--ease) !important;
 }
 
 a {

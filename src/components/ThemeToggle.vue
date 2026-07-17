@@ -49,7 +49,13 @@ function toggleWithTransition() {
   `
 
   const panel = document.createElement('div')
-  panel.style.cssText = `
+  // 用 !important 覆盖全局 .theme-transition 对 background 的过渡，避免遮罩背景也渐变
+  panel.style.setProperty(
+    'transition',
+    'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+    'important'
+  )
+  panel.style.cssText += `
     position: absolute;
     top: 0;
     left: 0;
@@ -59,25 +65,22 @@ function toggleWithTransition() {
       ? 'radial-gradient(circle at 8% 12%, rgba(159, 180, 204, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(216, 164, 127, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(200, 190, 175, 0.14) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
       : 'radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%), radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%), radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%), radial-gradient(circle at 50% -10%, #fffcfa, #f5f2ec 55%)'};
     transform: translate(-100%, -100%);
-    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
   `
   overlay.appendChild(panel)
   document.body.appendChild(overlay)
 
+  // 按钮滑动与页面颜色同时开始
+  toggle()
+
   requestAnimationFrame(() => {
     panel.style.transform = 'translate(0, 0)'
   })
 
-  // 遮罩平移到一半时切主题，配合全局 .theme-transition 让内容颜色平滑过渡
-  setTimeout(() => {
-    toggle()
-  }, 350)
-
   panel.addEventListener('transitionend', () => overlay.remove(), { once: true })
   setTimeout(() => {
     if (overlay.parentNode) overlay.remove()
-  }, 800)
+  }, 500)
 }
 </script>
 
@@ -109,7 +112,7 @@ function toggleWithTransition() {
   background: var(--accent);
   color: #2a2a2a;
   transform: translateX(0);
-  transition: transform 0.35s var(--ease);
+  transition: transform 0.4s var(--ease);
 }
 .thumb[data-pos='dark'] {
   transform: translateX(30px);
