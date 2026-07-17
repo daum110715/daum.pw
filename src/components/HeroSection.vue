@@ -197,6 +197,7 @@ onUnmounted(() => timer && clearInterval(timer))
 .social-icon :deep(svg) {
   width: 22px;
   height: 22px;
+  overflow: visible;
 }
 
 @media (max-width: 640px) {
