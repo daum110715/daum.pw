@@ -110,7 +110,8 @@ html.theme-transition *::after {
     fill 0.4s var(--ease),
     stroke 0.4s var(--ease),
     transform 0.4s var(--ease),
-    opacity 0.4s var(--ease) !important;
+    opacity 0.4s var(--ease),
+    clip-path 0.4s var(--ease) !important;
 }
 
 a {
