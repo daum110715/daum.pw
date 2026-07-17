@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 
 const STORAGE_KEY = 'daum-theme'
+const TRANSITION_DURATION = 600
 
 // 全局共享主题状态(模块单例)
 const theme = ref('light')
@@ -33,10 +34,27 @@ watch(theme, (t) => {
 
 export function useTheme() {
   function toggle() {
-    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    const root = typeof document !== 'undefined' ? document.documentElement : null
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    if (!root || prefersReduced) {
+      theme.value = theme.value === 'light' ? 'dark' : 'light'
+      return
+    }
+
+    // 先加上过渡类,下一帧切主题,让背景/文字/边框等颜色平滑过渡
+    root.classList.add('theme-transition')
+    requestAnimationFrame(() => {
+      theme.value = theme.value === 'light' ? 'dark' : 'light'
+      setTimeout(() => root.classList.remove('theme-transition'), TRANSITION_DURATION)
+    })
   }
+
   function set(t) {
     theme.value = t
   }
+
   return { theme, toggle, set }
 }

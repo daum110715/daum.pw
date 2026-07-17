@@ -92,10 +92,7 @@ const filtered = computed(() => {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-dim);
-  background: var(--bg);
-  transition:
-    color var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease);
 }
 .filter-btn:hover {
   color: var(--text);

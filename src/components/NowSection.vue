@@ -45,16 +45,13 @@ import NeuCard from '@/components/base/NeuCard.vue'
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 0;
+  padding: 18px 0;
 }
 .now-item:first-child {
   padding-top: 0;
 }
 .now-item:last-child {
   padding-bottom: 0;
-}
-.now-item + .now-item {
-  border-top: 1px solid var(--shadow-dark);
 }
 .now-text {
   font-size: 0.96rem;

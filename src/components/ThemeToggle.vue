@@ -1,61 +1,122 @@
 <template>
   <button
-    class="theme-toggle neu-inset"
+    class="theme-toggle"
     :aria-label="`切换到${theme === 'dark' ? '亮色' : '暗色'}主题`"
     :aria-pressed="theme === 'dark'"
-    @click="toggle"
+    @click="toggleWithTransition"
   >
-    <span class="thumb neu" :data-pos="theme">
-      <svg v-if="theme === 'light'" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="5" />
-        <line x1="12" y1="1" x2="12" y2="3" />
-        <line x1="12" y1="21" x2="12" y2="23" />
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-        <line x1="1" y1="12" x2="3" y2="12" />
-        <line x1="21" y1="12" x2="23" y2="12" />
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-      </svg>
-      <svg v-else class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-      </svg>
+    <span class="track">
+      <span class="thumb" :data-pos="theme">
+        <Icon
+          class="icon"
+          :icon="theme === 'light' ? 'ph:sun-thin' : 'ph:moon-thin'"
+          width="14"
+          height="14"
+        />
+      </span>
     </span>
   </button>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import { Icon } from '@iconify/vue'
 import { useTheme } from '@/composables/useTheme'
+
 const { theme, toggle } = useTheme()
+const reducedMotion = ref(false)
+
+onMounted(() => {
+  reducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+})
+
+function toggleWithTransition(e) {
+  if (reducedMotion.value) {
+    toggle()
+    return
+  }
+
+  const rect = e.currentTarget.getBoundingClientRect()
+  const x = rect.left + rect.width / 2
+  const y = rect.top + rect.height / 2
+  const nextTheme = theme.value === 'dark' ? 'light' : 'dark'
+
+  // 在内容背后做一个从新主题底色扩散的圆形遮罩，内容始终在最上层
+  const overlay = document.createElement('div')
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: ${nextTheme === 'dark'
+      ? 'radial-gradient(circle at 50% -10%, #31343c, #2b2e35 55%)'
+      : 'radial-gradient(circle at 50% -10%, #efece5, #e9e6df 55%)'};
+    clip-path: circle(0px at ${x}px ${y}px);
+    transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  `
+  document.body.appendChild(overlay)
+
+  requestAnimationFrame(() => {
+    const r = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    )
+    overlay.style.clipPath = `circle(${r}px at ${x}px ${y}px)`
+  })
+
+  // 遮罩扩展到一半时切主题，配合全局 .theme-transition 让内容颜色平滑过渡
+  setTimeout(() => {
+    toggle()
+  }, 300)
+
+  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true })
+  setTimeout(() => {
+    if (overlay.parentNode) overlay.remove()
+  }, 700)
+}
 </script>
 
 <style scoped>
 .theme-toggle {
-  position: relative;
-  width: 62px;
-  height: 34px;
-  border-radius: var(--radius-full);
-  padding: 4px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-shrink: 0;
+  padding: 0;
+  background: transparent;
+}
+.track {
+  position: relative;
+  width: 64px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--bg-2);
+  overflow: hidden;
 }
 .thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
   width: 26px;
   height: 26px;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
+  background: var(--accent);
+  color: #2a2a2a;
   transform: translateX(0);
-  transition: transform var(--dur) var(--ease);
+  transition: transform 0.35s var(--ease);
 }
 .thumb[data-pos='dark'] {
-  transform: translateX(28px);
+  transform: translateX(30px);
 }
-.thumb .icon {
+.icon {
   width: 14px;
   height: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb {
+    transition: none;
+  }
 }
 </style>

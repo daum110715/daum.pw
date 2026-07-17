@@ -21,11 +21,11 @@
   --pad: clamp(20px, 5vw, 48px);
   --section-gap: clamp(64px, 10vw, 120px);
 
-  /* 新拟态阴影距离/模糊 */
-  --dist: 6px;
-  --blur: 14px;
-  --dist-lg: 9px;
-  --blur-lg: 22px;
+  /* 新拟态阴影距离/模糊(更克制) */
+  --dist: 3px;
+  --blur: 8px;
+  --dist-lg: 5px;
+  --blur-lg: 12px;
 }
 
 /* ---------- Light theme (default) ---------- */
@@ -72,7 +72,7 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 92px;
+  scroll-padding-top: 24px;
 }
 
 body {
@@ -86,6 +86,27 @@ body {
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
   background-image: radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
   background-attachment: fixed;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+/* 主题切换时全页颜色/背景平滑过渡(不覆盖内容) */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 0.45s var(--ease),
+    background-image 0.45s var(--ease),
+    color 0.45s var(--ease),
+    border-color 0.45s var(--ease),
+    fill 0.45s var(--ease),
+    stroke 0.45s var(--ease),
+    transform 0.45s var(--ease),
+    opacity 0.45s var(--ease) !important;
 }
 
 a {
@@ -112,7 +133,7 @@ ul {
 
 /* scrollbar */
 html::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 html::-webkit-scrollbar-track {
   background: var(--bg);
@@ -120,7 +141,6 @@ html::-webkit-scrollbar-track {
 html::-webkit-scrollbar-thumb {
   background: var(--shadow-dark);
   border-radius: var(--radius-full);
-  border: 2px solid var(--bg);
 }
 
 ::selection {
@@ -187,46 +207,46 @@ h4 {
   margin-inline: auto;
 }
 
-/* ---------- Neumorphism surface utilities ---------- */
+/* ---------- Surface utilities (currently flat; neumorphism to be re-added later) ---------- */
 .neu {
-  background: var(--bg);
+  background: var(--bg-2);
   border-radius: var(--radius);
-  box-shadow:
-    calc(var(--dist) * -1) calc(var(--dist) * -1) var(--blur) var(--shadow-light),
-    var(--dist) var(--dist) var(--blur) var(--shadow-dark);
   transition:
-    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease),
     transform var(--dur) var(--ease);
 }
 .neu-lg {
-  background: var(--bg);
+  background: var(--bg-2);
   border-radius: var(--radius-lg);
-  box-shadow:
-    calc(var(--dist-lg) * -1) calc(var(--dist-lg) * -1) var(--blur-lg) var(--shadow-light),
-    var(--dist-lg) var(--dist-lg) var(--blur-lg) var(--shadow-dark);
   transition:
-    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease),
     transform var(--dur) var(--ease);
 }
 .neu-inset {
   background: var(--bg);
+  color: var(--accent-text);
   border-radius: var(--radius);
-  box-shadow:
-    inset calc(var(--dist) * -1) calc(var(--dist) * -1) var(--blur) var(--shadow-light),
-    inset var(--dist) var(--dist) var(--blur) var(--shadow-dark);
+  transition:
+    background var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+/* nested surfaces fall back to page background for contrast */
+.neu .neu,
+.neu-lg .neu,
+.neu-lg .neu-lg {
+  background: var(--bg);
+}
+.neu .neu-inset,
+.neu-lg .neu-inset {
+  background: var(--bg);
 }
 
 .neu-hover:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    calc(var(--dist-lg) * -1) calc(var(--dist-lg) * -1) var(--blur-lg) var(--shadow-light),
-    var(--dist-lg) var(--dist-lg) var(--blur-lg) var(--shadow-dark);
+  transform: translateY(-2px);
 }
 .neu-press:active {
   transform: scale(0.98);
-  box-shadow:
-    inset calc(var(--dist) * -1) calc(var(--dist) * -1) var(--blur) var(--shadow-light),
-    inset var(--dist) var(--dist) var(--blur) var(--shadow-dark);
 }
 
 /* ---------- Reveal animation ---------- */
@@ -235,8 +255,7 @@ h4 {
   transform: translateY(26px);
   transition:
     opacity 0.6s var(--ease),
-    transform 0.6s var(--ease),
-    box-shadow var(--dur) var(--ease);
+    transform 0.6s var(--ease);
 }
 .reveal.is-visible {
   opacity: 1;
