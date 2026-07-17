@@ -38,14 +38,14 @@ function toggleWithTransition() {
 
   const nextTheme = theme.value === 'dark' ? 'light' : 'dark'
 
-  // 在内容背后做一条可见的斜向光带，内容始终在最上层
+  // 做一条明显的斜向光带从页面上方扫过（临时、窄、半透明，不阻塞交互）
   const overlay = document.createElement('div')
   overlay.style.cssText = `
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 0;
-    backdrop-filter: brightness(1.18) saturate(1.25);
+    z-index: 100;
+    background: linear-gradient(90deg, transparent, rgba(159, 180, 204, 0.35), transparent);
     clip-path: polygon(-20% 0, 0 0, -20% 100%, -40% 100%);
     transition: clip-path 0.45s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: clip-path;
