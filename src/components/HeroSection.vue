@@ -10,12 +10,17 @@
           focusable="false"
           xmlns="http://www.w3.org/2000/svg"
         >
+          <defs>
+            <linearGradient id="heroBrandGrad" x1="0" y1="0" x2="5295.5" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" class="g-stop-1" />
+              <stop offset="1" class="g-stop-2" />
+            </linearGradient>
+          </defs>
           <g :transform="BRAND_GROUP_TRANSFORM">
             <path
               v-for="(p, i) in BRAND_PATHS"
               :key="i"
               class="hero-char-path"
-              :transform="`translate(${p.tx} 0)`"
               :d="p.d"
             />
           </g>
@@ -23,24 +28,6 @@
         <span class="visually-hidden">{{ BRAND_TEXT }}</span>
       </h1>
       <p class="hero-role reveal reveal-after-boot">用好奇心建造,用时间打磨</p>
-
-      <div
-        class="hero-sig reveal reveal-after-boot"
-        @mouseenter="pauseTimer"
-        @mouseleave="resumeTimer"
-        @focusin="pauseTimer"
-        @focusout="resumeTimer"
-      >
-        <Transition name="sig" mode="out-in">
-          <div class="sig-text" :key="index">
-            <p class="sig-line1">{{ current.line1 }}</p>
-            <p class="sig-line2">{{ current.line2 }}</p>
-          </div>
-        </Transition>
-        <button class="sig-next" aria-label="换一条签名" @click="next">
-          // 换一条
-        </button>
-      </div>
 
       <div class="hero-social reveal reveal-after-boot">
         <a
@@ -65,52 +52,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
-import { signatures } from '@/data/signatures'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
-
-const index = ref(0)
-const reducedMotion = ref(false)
-
-function pickRandom() {
-  if (signatures.length <= 1) {
-    index.value = 0
-    return
-  }
-  let n = index.value
-  while (n === index.value) n = Math.floor(Math.random() * signatures.length)
-  index.value = n
-}
-const current = computed(() => signatures[index.value])
-
-let timer = null
-function resetTimer() {
-  if (timer) clearInterval(timer)
-  timer = setInterval(pickRandom, 7000)
-}
-function pauseTimer() {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
-}
-function resumeTimer() {
-  if (!timer && !reducedMotion.value) resetTimer()
-}
-function next() {
-  pickRandom()
-  if (!reducedMotion.value) resetTimer()
-}
-
-onMounted(() => {
-  reducedMotion.value =
-    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  pickRandom()
-  if (!reducedMotion.value) resetTimer()
-})
-onUnmounted(() => timer && clearInterval(timer))
 
 </script>
 
@@ -144,7 +88,7 @@ onUnmounted(() => timer && clearInterval(timer))
   will-change: transform;
 }
 .hero-char-path {
-  fill: var(--brand-ink, var(--accent-text));
+  fill: url(#heroBrandGrad);
 }
 /* 交接前占位不可见;落地后立即显示(无淡入抢戏--飞行克隆已盖住同位) */
 .hero-title.handoff-pending .hero-brand-svg {
@@ -165,55 +109,6 @@ onUnmounted(() => timer && clearInterval(timer))
   color: var(--text-dim);
   font-size: clamp(1rem, 2.5vw, 1.2rem);
   font-family: var(--font-display);
-}
-.hero-sig {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 16px 22px;
-  border-radius: var(--radius);
-  background: var(--bg-2);
-  max-width: 520px;
-  width: 100%;
-  margin-top: 6px;
-}
-.sig-text {
-  flex: 1;
-  text-align: left;
-  min-width: 0;
-}
-.sig-line1 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1rem;
-}
-.sig-line2 {
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  margin-top: 2px;
-}
-.sig-enter-active,
-.sig-leave-active {
-  transition: opacity 0.3s var(--ease);
-}
-.sig-enter-from,
-.sig-leave-to {
-  opacity: 0;
-}
-.sig-next {
-  flex-shrink: 0;
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font-size: 0.8rem;
-  font-family: var(--font-display);
-  font-weight: 600;
-  white-space: nowrap;
-  padding: 8px 14px;
-  border-radius: var(--radius-full);
-  transition: background var(--dur) var(--ease);
-}
-.sig-next:hover {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .hero-social {
@@ -245,13 +140,4 @@ onUnmounted(() => timer && clearInterval(timer))
   overflow: visible;
 }
 
-@media (max-width: 640px) {
-  .hero-sig {
-    flex-direction: column;
-    gap: 10px;
-  }
-  .sig-text {
-    text-align: left;
-  }
-}
 </style>

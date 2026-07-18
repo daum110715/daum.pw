@@ -61,18 +61,14 @@ function brandInk() {
   return (
     getComputedStyle(document.documentElement).getPropertyValue('--brand-ink').trim() ||
     getComputedStyle(document.documentElement).getPropertyValue('--accent-text').trim() ||
-    '#5c6f7f'
+    '#b45309'
   )
 }
 
-/** 全站品牌名实色钉死:preloader path / Hero path / 残留 .brand-ink */
+/** 品牌名渐变(SVG url(#*BrandGrad) 由 CSS stop-color 跟随主题);残留 .brand-ink 仍钉实色 */
 function syncInk() {
   const ink = brandInk()
   document.documentElement.style.setProperty('--brand-ink', ink)
-  document.querySelectorAll('.pl-char-path, .hero-char-path').forEach((p) => {
-    p.setAttribute('fill', ink)
-    p.style.fill = ink
-  })
   document.querySelectorAll('.brand-ink').forEach((el) => {
     el.style.background = 'none'
     el.style.backgroundImage = 'none'
@@ -106,16 +102,14 @@ function killPreloader(el) {
   if (el.parentNode) el.parentNode.removeChild(el)
 }
 
-/** 描边钉在完成态(fill 实色,去描边) */
-function finishDraw(paths, ink) {
+/** 描边钉在完成态(显渐变填充,去描边) */
+function finishDraw(paths) {
   paths.forEach((p) => {
     p.style.animation = 'none'
     p.style.strokeDashoffset = '0'
     p.style.fillOpacity = '1'
     p.style.strokeWidth = '0'
     p.style.stroke = 'none'
-    p.setAttribute('fill', ink)
-    p.style.fill = ink
   })
 }
 

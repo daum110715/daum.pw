@@ -31,35 +31,38 @@
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
-  --bg: #f5f2ec;
-  --bg-2: #fffcfa;
-  --text: #525252;
-  --text-dim: #7d7a75;
-  --accent: #9fb4cc; /* 柔和灰蓝 */
-  --accent-2: #d8a47f; /* 柔和桃 */
-  --accent-text: #5c6f7f; /* 用于浅底上的强调文字 */
-  --brand-ink: #a0785a; /* 品牌名:浅色模式暖棕桃(与 accent-2 暖桃同系),大字可读;与 index.html 内联同步 */
-  --accent-soft: rgba(159, 180, 204, 0.16);
+  --bg: #fcfaf6;
+  --bg-2: #ffffff;
+  --text: #44403c;
+  --text-dim: #78716c;
+  --accent: #f59e0b; /* 亮橙(主色) */
+  --accent-2: #fb923c; /* 暖橘(同色系辅色,不抢戏) */
+  --accent-text: #b45309; /* 浅底强调文字:深橙可读 */
+  --brand-ink: #e6cda6; /* 品牌名:偏白浅橙;与 index.html 内联同步 */
+  --accent-soft: rgba(245, 158, 11, 0.12);
   --shadow-light: #ffffff;
-  --shadow-dark: #e3e0d8;
-  --ring: rgba(159, 180, 204, 0.5);
+  --shadow-dark: #ede0cf;
+  --ring: rgba(245, 158, 11, 0.40);
   color-scheme: light;
 }
+/* 品牌字 SVG 渐变 stop:跟随主题 --accent/--accent-2 */
+.g-stop-1 { stop-color: color-mix(in srgb, var(--accent) 55%, white); }
+.g-stop-2 { stop-color: color-mix(in srgb, var(--accent-2) 55%, white); }
 
 /* ---------- Dark theme ---------- */
 [data-theme='dark'] {
-  --bg: #2b2e35;
-  --bg-2: #31343c;
-  --text: #e8e8ec;
-  --text-dim: #9a9aa3;
-  --accent: #f5b842;
-  --accent-2: #e8723a;
-  --accent-text: #f5b842; /* 暗底上亮金可读,与 accent 同 */
-  --brand-ink: #f5b842; /* 品牌名实色 */
-  --accent-soft: rgba(245, 184, 66, 0.14);
-  --shadow-light: #363a42;
-  --shadow-dark: #21242b;
-  --ring: rgba(245, 184, 66, 0.55);
+  --bg: #1a1410;
+  --bg-2: #241c16;
+  --text: #f5ede0;
+  --text-dim: #a8967e;
+  --accent: #fbbf24; /* 亮金橙(主色) */
+  --accent-2: #fb923c; /* 暖橘(同色系辅色) */
+  --accent-text: #fbbf24; /* 暗底强调:亮金橙可读 */
+  --brand-ink: #fbbf24; /* 品牌名:主色统一 */
+  --accent-soft: rgba(251, 191, 36, 0.15);
+  --shadow-light: #2a2018;
+  --shadow-dark: #0d0a07;
+  --ring: rgba(251, 191, 36, 0.5);
   color-scheme: dark;
 }
 
@@ -78,7 +81,11 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 146, 60, 0.05) 100%),
+    radial-gradient(circle at 50% -10%, var(--bg-2), transparent 55%);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-body);
   font-size: 16px;
