@@ -23,7 +23,7 @@ import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useTheme } from '@/composables/useTheme'
 
-const { theme, toggle } = useTheme()
+const { theme, toggle, set } = useTheme()
 const reducedMotion = ref(false)
 
 onMounted(() => {
@@ -31,38 +31,25 @@ onMounted(() => {
 })
 
 function toggleWithTransition() {
+  const next = theme.value === 'dark' ? 'light' : 'dark'
   if (reducedMotion.value) {
-    toggle()
+    set(next)
     return
   }
-
-  const nextTheme = theme.value === 'dark' ? 'light' : 'dark'
-
-  // 做一条明显的斜向光带从页面上方扫过（临时、窄、半透明，不阻塞交互）
-  const overlay = document.createElement('div')
-  overlay.style.cssText = `
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 100;
-    background: linear-gradient(90deg, transparent, rgba(159, 180, 204, 0.35), transparent);
-    clip-path: polygon(-20% 0, 0 0, -20% 100%, -40% 100%);
-    transition: clip-path 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: clip-path;
-  `
-  document.body.appendChild(overlay)
-
-  // 按钮滑动与页面颜色同时开始
-  toggle()
-
-  requestAnimationFrame(() => {
-    overlay.style.clipPath = 'polygon(100% 0, 120% 0, 120% 100%, 100% 100%)'
-  })
-
-  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true })
-  setTimeout(() => {
-    if (overlay.parentNode) overlay.remove()
-  }, 550)
+  // 幕布方向跟按钮 thumb 一致:切到 dark(thumb 右移)幕布从左向右揭,
+  // 切到 light(thumb 左移)幕布从右向左揭(neu.css 读 --theme-curtain-from)
+  const fromInset = next === 'dark' ? 'inset(0 100% 0 0)' : 'inset(0 0 0 100%)'
+  document.documentElement.style.setProperty('--theme-curtain-from', fromInset)
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      // 同步切 data-theme,确保 VT 截到新主题快照(set 的 watch 异步,不保险)
+      document.documentElement.setAttribute('data-theme', next)
+      set(next)
+    })
+  } else {
+    // 回退:全站颜色平滑过渡(toggle 内加 theme-transition 类)
+    toggle()
+  }
 }
 </script>
 

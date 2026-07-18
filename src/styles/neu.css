@@ -38,6 +38,7 @@
   --accent: #9fb4cc; /* 柔和灰蓝 */
   --accent-2: #d8a47f; /* 柔和桃 */
   --accent-text: #5c6f7f; /* 用于浅底上的强调文字 */
+  --brand-ink: #a0785a; /* 品牌名:浅色模式暖棕桃(与 accent-2 暖桃同系),大字可读;与 index.html 内联同步 */
   --accent-soft: rgba(159, 180, 204, 0.16);
   --shadow-light: #ffffff;
   --shadow-dark: #e3e0d8;
@@ -54,6 +55,7 @@
   --accent: #f5b842;
   --accent-2: #e8723a;
   --accent-text: #f5b842; /* 暗底上亮金可读,与 accent 同 */
+  --brand-ink: #f5b842; /* 品牌名实色 */
   --accent-soft: rgba(245, 184, 66, 0.14);
   --shadow-light: #363a42;
   --shadow-dark: #21242b;
@@ -112,6 +114,27 @@ html.theme-transition *::after {
     transform 0.4s var(--ease),
     opacity 0.4s var(--ease),
     clip-path 0.4s var(--ease) !important;
+}
+
+/* ---------- 主题切换:横向幕布(View Transitions API) ----------
+   新主题快照从右侧滑入覆盖旧主题快照(幕布感)。reduced-motion 下
+   ThemeToggle 不触发 VT 直接切;不支持 VT 的浏览器回退到上面全站渐变。 */
+::view-transition-old(root) {
+  animation: none;
+  z-index: 1;
+}
+::view-transition-new(root) {
+  animation: theme-curtain-in 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  z-index: 2;
+}
+@keyframes theme-curtain-in {
+  /* 方向跟按钮 thumb:dark 从左向右揭 / light 从右向左揭(--theme-curtain-from) */
+  from {
+    clip-path: var(--theme-curtain-from, inset(0 0 0 100%));
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 a {
@@ -283,11 +306,40 @@ h4 {
   font-family: var(--font-display);
   letter-spacing: 0.02em;
 }
+/* 装饰渐变字(页脚等) */
 .grad-text {
-  background: linear-gradient(135deg, var(--accent-text), var(--accent-2));
+  background-image: linear-gradient(135deg, var(--accent-text), var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+/*
+ * 品牌名专用实色 — 开屏描边/填实/飞行/Hero 标题必须同一色源,
+ * 禁止 SVG 渐变 fill 与 CSS clip 混用(两套渲染必然跳色)。
+ */
+.brand-ink,
+.hero-title .grad-text {
+  background-image: none !important;
+  background: none !important;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--brand-ink, var(--accent-text)) !important;
+  -webkit-text-fill-color: var(--brand-ink, var(--accent-text)) !important;
+}
+
+/* 可访问性:视觉隐藏但屏幕阅读器可读(Hero SVG 品牌名的文本兜底) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---------- Reduced motion ---------- */
@@ -299,7 +351,8 @@ h4 {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .reveal {
+  .reveal,
+  .reveal-after-boot {
     opacity: 1;
     transform: none;
   }

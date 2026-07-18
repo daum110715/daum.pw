@@ -1,9 +1,26 @@
 <template>
   <section id="hero" class="section hero" aria-label="首页">
     <div class="container hero-inner">
-      <!-- 标题与开屏品牌衔接,不走普通 reveal,由 main.js handoff 落地 -->
+      <!-- 标题与开屏品牌同源 SVG:preloader 描边 -> 克隆飞入此位 -> 落地零跳变 -->
       <h1 class="hero-title handoff-pending">
-        <span class="grad-text">daum12569</span>
+        <svg
+          class="hero-brand-svg"
+          :viewBox="BRAND_VIEWBOX"
+          aria-hidden="true"
+          focusable="false"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <g :transform="BRAND_GROUP_TRANSFORM">
+            <path
+              v-for="(p, i) in BRAND_PATHS"
+              :key="i"
+              class="hero-char-path"
+              :transform="`translate(${p.tx} 0)`"
+              :d="p.d"
+            />
+          </g>
+        </svg>
+        <span class="visually-hidden">{{ BRAND_TEXT }}</span>
       </h1>
       <p class="hero-role reveal reveal-after-boot">用好奇心建造,用时间打磨</p>
 
@@ -52,6 +69,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { signatures } from '@/data/signatures'
 import { social } from '@/data/social'
+import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
 
 const index = ref(0)
 const reducedMotion = ref(false)
@@ -113,21 +131,32 @@ onUnmounted(() => timer && clearInterval(timer))
 }
 .hero-title {
   font-size: clamp(2.8rem, 11vw, 6rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
   line-height: 1;
 }
-/* 交接前占位不可见;落地后立即显示(无淡入抢戏——飞行层已盖住同位) */
-.hero-title.handoff-pending .grad-text {
+/* Hero 品牌字:与 preloader 同源 Outfit800 SVG path,同字形同墨迹占比,
+   height: 1em 使 SVG 视觉高≈原 HTML 文字(同字号同占比)。若实测 Hero 字
+   偏大/偏小,微调此系数(偏大调小趋 0.9,偏小调大趋 1.2)。 */
+.hero-brand-svg {
+  height: 1em;
+  width: auto;
+  display: block;
+  overflow: visible;
+  will-change: transform;
+}
+.hero-char-path {
+  fill: var(--brand-ink, var(--accent-text));
+}
+/* 交接前占位不可见;落地后立即显示(无淡入抢戏--飞行克隆已盖住同位) */
+.hero-title.handoff-pending .hero-brand-svg {
   opacity: 0;
 }
-.hero-title.is-landed .grad-text {
+.hero-title.is-landed .hero-brand-svg {
   opacity: 1;
   transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-title.handoff-pending .grad-text,
-  .hero-title.is-landed .grad-text {
+  .hero-title.handoff-pending .hero-brand-svg,
+  .hero-title.is-landed .hero-brand-svg {
     opacity: 1;
     transition: none;
   }

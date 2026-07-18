@@ -2,38 +2,125 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import './styles/neu.css'
 import './plugins/icons.js'
+import { BRAND_PATHS } from './data/brandGlyph.js'
 
 createApp(App).mount('#app')
 
-/**
- * 开屏衔接
- * A. Outfit 800 字形轮廓逐字描边 + 填实(CSS pl-draw,同 fca14bf)
- * B. 实心飞行层叠在品牌位
- * C. 拆字 FLIP 飞到 Hero 标题
- * D. 同位交接
+/* ============================================================
+ * 开屏衔接(方案 D:同源 SVG 克隆飞行)
  *
- * 出场动画参考上次 git 提交的 pathLength 行笔;
- * 衔接/舞台/reveal 等为现在新增能力,一并保留。
- */
-const prefersReduced =
+ * 根因(三视角对抗审查确认):原方案用 HTML <span> 飞行层去对齐 SVG path
+ * 墨迹,两套渲染管线度量语义不同——SVG getBoundingClientRect 返回字形
+ * 墨迹盒,HTML 返回 line/em 盒(line-height:1 时≈字号);setFontToHeight
+ * 令 HTML 盒高=SVG墨迹高,但 HTML 实际墨迹仅≈0.74×字号,系统性偏小约
+ * 26% → 盖不住;left/top/font-size 逐帧 layout+重栅格 → 抖动;飞层独立
+ * 合成层与 Hero 静态层子像素不一致 + 3 帧同框 → 落地重影。更致命的是
+ * SVG 墨迹占比 0.587、HTML 占比 0.72,落地切换必有 18% 墨迹跳变,无法
+ * 靠对齐消除。
+ *
+ * 修复:Hero 标题也用同一份 Outfit 800 SVG path(.hero-brand-svg)。描边
+ * 完成后克隆 preloader SVG,用 transform: translate+scale 从描边位置飞到
+ * Hero SVG 位置(同 viewBox 同墨迹比例,零对齐成本,矢量缩放不糊,GPU
+ * 合成不抖)。落地 Hero SVG 亮起(被克隆盖住),下一帧移除克隆——同源
+ * 同位,零跳变。pin/二分/重排全部消除。
+ *
+ * 同修独立时序 bug(架构改造不会自动修复):
+ * - 4.5s 兜底揭示 Hero(收敛到共享 finishBoot,挂 window.__finishBoot)
+ * - guard 抢先 return 前调 finishBoot(防兜底抢先时 Hero 永久隐形)
+ * - 入口立即置 done=1 防兜底并发移除 preloader
+ * - transitionend+setTimeout 替代固定 wait(防负载下中途硬切)
+ * - document.hidden 后台标签页快进(防 rAF/transition 挂起)
+ * - reduced 跳过 fonts.ready 竞态
+ * - .catch 清理已提升到 body 的克隆
+ * ============================================================ */
+
+const reduced =
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const LETTERS = 'daum12569'
-const HOLD_MS = 220
-const MOVE_MS = 820
-const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)'
-// pl-draw: delay 0.15 + 8*0.1 + 0.45 = 1.4s
-const LINE_DRAW_MS = 150 + (LETTERS.length - 1) * 100 + 450
+const MOVE_MS = 780
+const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+/** 与 index.html pl-draw 一致: 0.15 + 8×0.1 + 0.5 */
+const DRAW_MS = 150 + 800 + 500
 
-function nextFrame() {
-  return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/** 下一帧:rAF 为主,setTimeout 兜底(后台标签页 rAF 暂停时仍能推进) */
+const nextFrame = () =>
+  new Promise((r) => {
+    let done = false
+    const fin = () => {
+      if (done) return
+      done = true
+      r()
+    }
+    requestAnimationFrame(fin)
+    window.setTimeout(fin, 50)
+  })
+
+function brandInk() {
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue('--brand-ink').trim() ||
+    getComputedStyle(document.documentElement).getPropertyValue('--accent-text').trim() ||
+    '#5c6f7f'
+  )
 }
 
-function wait(ms) {
-  return new Promise((r) => window.setTimeout(r, ms))
+/** 全站品牌名实色钉死:preloader path / Hero path / 残留 .brand-ink */
+function syncInk() {
+  const ink = brandInk()
+  document.documentElement.style.setProperty('--brand-ink', ink)
+  document.querySelectorAll('.pl-char-path, .hero-char-path').forEach((p) => {
+    p.setAttribute('fill', ink)
+    p.style.fill = ink
+  })
+  document.querySelectorAll('.brand-ink').forEach((el) => {
+    el.style.background = 'none'
+    el.style.backgroundImage = 'none'
+    el.style.color = ink
+    el.style.webkitTextFillColor = ink
+  })
+  return ink
 }
 
-function waitTransition(el, prop, ms) {
+/** 共享收尾:揭示 Hero 标题 + 级联 reveal-after-boot。挂 window 供 index.html 兜底复用 */
+function finishBoot(heroTitle) {
+  document.documentElement.classList.add('boot-done')
+  document.body.setAttribute('aria-busy', 'false')
+  if (heroTitle) {
+    heroTitle.classList.remove('handoff-pending')
+    heroTitle.classList.add('is-landed')
+  }
+  document.querySelectorAll('.reveal-after-boot:not(.is-visible)').forEach((node, i) => {
+    window.setTimeout(() => node.classList.add('is-visible'), 80 + i * 90)
+  })
+}
+window.__finishBoot = function () {
+  finishBoot(document.querySelector('.hero-title'))
+}
+
+function killPreloader(el) {
+  if (!el) return
+  el.dataset.done = '1'
+  el.classList.add('is-done')
+  el.setAttribute('aria-hidden', 'true')
+  if (el.parentNode) el.parentNode.removeChild(el)
+}
+
+/** 描边钉在完成态(fill 实色,去描边) */
+function finishDraw(paths, ink) {
+  paths.forEach((p) => {
+    p.style.animation = 'none'
+    p.style.strokeDashoffset = '0'
+    p.style.fillOpacity = '1'
+    p.style.strokeWidth = '0'
+    p.style.stroke = 'none'
+    p.setAttribute('fill', ink)
+    p.style.fill = ink
+  })
+}
+
+/** transitionend(transform)+ setTimeout 双保险,替代固定 wait */
+function onTransformEnd(el, timeout) {
   return new Promise((resolve) => {
     let done = false
     const finish = () => {
@@ -43,345 +130,140 @@ function waitTransition(el, prop, ms) {
       resolve()
     }
     const onEnd = (e) => {
-      if (e.target === el && (!prop || e.propertyName === prop)) finish()
+      if (e.target === el && e.propertyName === 'transform') finish()
     }
     el.addEventListener('transitionend', onEnd)
-    window.setTimeout(finish, ms + 180)
+    window.setTimeout(finish, timeout)
   })
 }
 
-function box(r) {
-  return {
-    left: r.left,
-    top: r.top,
-    width: r.width,
-    height: r.height,
-    cx: r.left + r.width / 2,
-    cy: r.top + r.height / 2,
-  }
-}
-
-function finishBoot(heroTitle) {
-  document.documentElement.classList.add('boot-done')
-  document.body.setAttribute('aria-busy', 'false')
-  if (heroTitle) {
-    heroTitle.classList.remove('handoff-pending')
-    heroTitle.classList.add('is-landed')
-  }
-  document.querySelectorAll('.reveal-after-boot').forEach((el, i) => {
-    window.setTimeout(() => el.classList.add('is-visible'), 70 + i * 85)
-  })
-}
-
-function simpleExit(el) {
-  el.dataset.done = '1'
-  el.classList.add('is-done')
-  el.setAttribute('aria-hidden', 'true')
-  finishBoot(document.querySelector('.hero-title'))
-  const remove = () => {
-    if (el.parentNode) el.parentNode.removeChild(el)
-  }
-  el.addEventListener(
-    'animationend',
-    (e) => {
-      if (e.target === el) remove()
-    },
-    { once: true },
-  )
-  window.setTimeout(remove, 900)
-}
-
-function heroCharBoxes(heroBrand) {
-  const text = (heroBrand.textContent || '').trim()
-  if (heroBrand.childNodes.length !== 1 || heroBrand.firstChild.nodeType !== Node.TEXT_NODE) {
-    heroBrand.textContent = text
-  }
-  const node = heroBrand.firstChild
-  const range = document.createRange()
-  const out = []
-  for (let i = 0; i < text.length; i++) {
-    range.setStart(node, i)
-    range.setEnd(node, i + 1)
-    out.push(box(range.getBoundingClientRect()))
-  }
-  return out
-}
-
-/** 在品牌位叠一层与 Hero 同字体的实心字,尺寸贴合 brand 盒 */
-function buildFlyerFromBrand(brand, heroBrand) {
-  const from = box(brand.getBoundingClientRect())
-  if (from.width < 2 || from.height < 2) return null
-
-  const cs = getComputedStyle(heroBrand)
-  const heroFs = parseFloat(cs.fontSize) || 48
-  const brandFs = from.height * 0.92
-  const letterSpacing =
-    cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '-0.03em'
-
-  const layer = document.createElement('div')
-  layer.className = 'pl-handoff-word'
-  layer.setAttribute('aria-hidden', 'true')
-  layer.style.cssText = [
-    'position:fixed',
-    `left:${from.left}px`,
-    `top:${from.top}px`,
-    `width:${from.width}px`,
-    `height:${from.height}px`,
-    'margin:0',
-    'padding:0',
-    'z-index:10002',
-    'pointer-events:none',
-    'display:flex',
-    'align-items:center',
-    'justify-content:center',
-    'box-sizing:border-box',
-    'opacity:0',
-  ].join(';')
-
-  const solid = document.createElement('span')
-  solid.className = 'pl-brand-solid grad-text'
-  solid.textContent = LETTERS
-  solid.style.cssText = [
-    'display:block',
-    'line-height:1',
-    'white-space:nowrap',
-    'margin:0',
-    'padding:0',
-    `font-family:${cs.fontFamily}`,
-    `font-weight:${cs.fontWeight || 800}`,
-    `letter-spacing:${letterSpacing}`,
-    `font-size:${brandFs}px`,
-  ].join(';')
-  layer.appendChild(solid)
-  document.body.appendChild(layer)
-
-  layer.style.opacity = '0.02'
-  void solid.offsetWidth
-  let sr = solid.getBoundingClientRect()
-  if (sr.height > 0.5) {
-    solid.style.fontSize = `${brandFs * (from.height / sr.height)}px`
-    void solid.offsetWidth
-    sr = solid.getBoundingClientRect()
-  }
-  // 宽度接近 brand 时观感更好(同 Outfit 800 轮廓)
-  if (sr.width > 0.5 && Math.abs(sr.width - from.width) / from.width > 0.06) {
-    const fsNow = parseFloat(solid.style.fontSize)
-    solid.style.fontSize = `${fsNow * (from.width / sr.width)}px`
-    void solid.offsetWidth
-    sr = solid.getBoundingClientRect()
-    if (sr.height > from.height * 1.1) {
-      solid.style.fontSize = `${fsNow * (from.height / sr.height)}px`
-      void solid.offsetWidth
-      sr = solid.getBoundingClientRect()
+/** dev assert:比对 index.html 内联 preloader path 与 brandGlyph.js(SSOT) */
+function assertBrandSync() {
+  try {
+    const dom = document.querySelectorAll('#preloader-brand-svg .pl-char-path')
+    if (dom.length !== BRAND_PATHS.length) {
+      console.error(
+        `[brand] preloader path 数量(${dom.length})与 brandGlyph.js(${BRAND_PATHS.length})不一致,飞行将错位`,
+      )
+      return
     }
-  }
-
-  const w = Math.max(sr.width, 1)
-  const h = Math.max(sr.height, 1)
-  layer.style.left = `${from.cx - w / 2}px`
-  layer.style.top = `${from.cy - h / 2}px`
-  layer.style.width = `${w}px`
-  layer.style.height = `${h}px`
-  layer.style.opacity = '0'
-
-  return {
-    layer,
-    solid,
-    heroFs,
-    fitFs: parseFloat(solid.style.fontSize) || brandFs,
+    dom.forEach((p, i) => {
+      if (p.getAttribute('d') !== BRAND_PATHS[i].d) {
+        console.error(`[brand] preloader path #${i} 与 brandGlyph.js 不同源,飞行将错位`)
+      }
+    })
+  } catch (e) {
+    /* 忽略 */
   }
 }
 
-function spawnFlyers(solid, fitFs) {
-  const text = (solid.textContent || LETTERS).trim()
-  solid.textContent = text
-  const node = solid.firstChild
-  if (!node || node.nodeType !== Node.TEXT_NODE) return null
-
-  const cs = getComputedStyle(solid)
-  const range = document.createRange()
-  const flyers = []
-
-  for (let i = 0; i < text.length; i++) {
-    range.setStart(node, i)
-    range.setEnd(node, i + 1)
-    const r = box(range.getBoundingClientRect())
-    if (r.width < 0.5) continue
-
-    const cell = document.createElement('div')
-    cell.className = 'pl-letter-cell'
-    cell.dataset.ch = text[i]
-    cell.style.cssText = [
-      'position:fixed',
-      `left:${r.left}px`,
-      `top:${r.top}px`,
-      `width:${r.width}px`,
-      `height:${r.height}px`,
-      'margin:0',
-      'padding:0',
-      'z-index:10003',
-      'pointer-events:none',
-      'display:flex',
-      'align-items:center',
-      'justify-content:center',
-      'box-sizing:border-box',
-      'opacity:1',
-    ].join(';')
-
-    const span = document.createElement('span')
-    span.className = 'pl-brand-solid grad-text'
-    span.textContent = text[i]
-    span.style.cssText = [
-      'display:block',
-      'line-height:1',
-      'white-space:nowrap',
-      'margin:0',
-      'padding:0',
-      `font-family:${cs.fontFamily}`,
-      `font-weight:${cs.fontWeight}`,
-      'letter-spacing:0',
-      `font-size:${fitFs}px`,
-    ].join(';')
-    cell.appendChild(span)
-    document.body.appendChild(cell)
-    flyers.push({ cell, span, ch: text[i] })
-  }
-  return flyers
-}
-
-async function handoffExit(el) {
-  const brand = el.querySelector('.preloader__brand')
-  const paths = el.querySelectorAll('.pl-char-path')
+async function handoff() {
+  const el = document.getElementById('preloader')
   const heroTitle = document.querySelector('.hero-title')
-  const heroBrand = document.querySelector('.hero-title .grad-text')
 
-  if (!brand || !heroTitle || !heroBrand) {
-    simpleExit(el)
+  // guard:已被兜底处理 → 仍要揭示 Hero(修原 guard 静默 return 致永久隐形)
+  if (!el || el.dataset.done === '1') {
+    finishBoot(heroTitle)
     return
   }
 
-  el.dataset.done = '1'
-  heroTitle.classList.add('handoff-pending')
+  // reduced 或后台标签页:rAF/transition 不可靠,直接快进
+  if (reduced || document.hidden) {
+    killPreloader(el)
+    finishBoot(heroTitle)
+    return
+  }
 
-  // 钉死品牌位;确保描边/填色完成态
-  brand.style.animation = 'none'
-  brand.style.transform = 'none'
-  paths.forEach((p) => {
-    p.style.animation = 'none'
-    p.style.strokeDashoffset = '0'
-    p.style.fillOpacity = '1'
-  })
+  const brand = document.getElementById('preloader-brand-svg')
+  const heroSvg = document.querySelector('.hero-brand-svg')
+  const paths = [...el.querySelectorAll('.pl-char-path')]
+
+  if (!heroTitle || !heroSvg || !brand || paths.length < 9) {
+    killPreloader(el)
+    finishBoot(heroTitle)
+    return
+  }
+
+  // 入口立即占位,防 4.5s 兜底并发移除 preloader
+  el.dataset.done = '1'
+
+  const ink = syncInk()
+
+  // ---- A. 描边完成态 ----
+  finishDraw(paths, ink)
   void brand.offsetWidth
   await nextFrame()
 
-  // 提示/进度退场(品牌已填实)
-  el.classList.add('is-filling')
-  if (HOLD_MS > 0) await wait(HOLD_MS)
-
-  // ========== 飞向 Hero ==========
-  const flyer = buildFlyerFromBrand(brand, heroBrand)
-  if (!flyer) {
-    simpleExit(el)
+  const pre = brand.getBoundingClientRect()
+  // brand 异常零尺寸(被 detach 等):硬退
+  if (pre.width < 2 || pre.height < 2) {
+    killPreloader(el)
+    finishBoot(heroTitle)
     return
   }
-  const { layer, solid, heroFs, fitFs } = flyer
 
+  // ---- B. 克隆 SVG,锁定到当前位置(fixed,视觉不动) ----
+  const clone = brand.cloneNode(true)
+  clone.setAttribute('aria-hidden', 'true')
+  clone.classList.add('pl-fly-svg')
+  clone.style.position = 'fixed'
+  clone.style.left = pre.left + 'px'
+  clone.style.top = pre.top + 'px'
+  clone.style.width = pre.width + 'px'
+  clone.style.height = pre.height + 'px'
+  clone.style.margin = '0'
+  clone.style.transformOrigin = '0 0'
+  clone.style.willChange = 'transform'
+  clone.style.zIndex = '10003'
+  clone.style.pointerEvents = 'none'
+  document.body.appendChild(clone)
+
+  // 幕布硬切隐藏(无淡化)
   brand.style.visibility = 'hidden'
-  brand.style.opacity = '0'
-  layer.style.opacity = '1'
-  void layer.offsetWidth
-
-  void heroBrand.offsetWidth
+  el.style.visibility = 'hidden'
+  el.style.pointerEvents = 'none'
   await nextFrame()
-  const targets = heroCharBoxes(heroBrand)
-  if (targets.length < LETTERS.length) {
-    layer.remove()
-    simpleExit(el)
-    return
-  }
 
-  const flyers = spawnFlyers(solid, fitFs)
-  if (!flyers || flyers.length < LETTERS.length) {
-    layer.remove()
-    simpleExit(el)
-    return
-  }
-  layer.remove()
+  // ---- C. 量终点,transform 飞行(同源同墨迹比例,矢量缩放不糊) ----
+  const to = heroSvg.getBoundingClientRect()
+  const dx = to.left - pre.left
+  const dy = to.top - pre.top
+  const sx = pre.width > 0 ? to.width / pre.width : 1
+  const sy = pre.height > 0 ? to.height / pre.height : 1
 
-  el.classList.add('is-done', 'is-handoff', 'is-morphing')
-  el.setAttribute('aria-hidden', 'true')
-
-  flyers.forEach(({ cell, span }, i) => {
-    const delay = Math.min(i * 16, 90)
-    cell.style.transition = [
-      `left ${MOVE_MS}ms ${EASE_OUT}`,
-      `top ${MOVE_MS}ms ${EASE_OUT}`,
-      `width ${MOVE_MS}ms ${EASE_OUT}`,
-      `height ${MOVE_MS}ms ${EASE_OUT}`,
-    ].join(',')
-    span.style.transition = `font-size ${MOVE_MS}ms ${EASE_OUT}`
-    cell.style.transitionDelay = `${delay}ms`
-    span.style.transitionDelay = `${delay}ms`
-  })
-
+  clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
   await nextFrame()
-  flyers.forEach((f, i) => {
-    f.to = targets[i]
-  })
-  flyers.forEach(({ cell, span, to }) => {
-    cell.style.left = `${to.left}px`
-    cell.style.top = `${to.top}px`
-    cell.style.width = `${Math.max(to.width, 1)}px`
-    cell.style.height = `${Math.max(to.height, 1)}px`
-    span.style.fontSize = `${heroFs}px`
-  })
+  clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
 
-  const maxDelay = Math.min((flyers.length - 1) * 16, 90)
-  await waitTransition(flyers[0].cell, 'left', MOVE_MS + maxDelay)
+  await onTransformEnd(clone, MOVE_MS + 200)
 
-  flyers.forEach(({ cell, span, to }) => {
-    cell.style.transition = 'none'
-    span.style.transition = 'none'
-    cell.style.left = `${to.left}px`
-    cell.style.top = `${to.top}px`
-    cell.style.width = `${Math.max(to.width, 1)}px`
-    cell.style.height = `${Math.max(to.height, 1)}px`
-    span.style.fontSize = `${heroFs}px`
-  })
-  void flyers[0].cell.offsetWidth
-
-  // ========== 交接 ==========
+  // ---- D. 落地:Hero SVG 亮起(被克隆盖住),下一帧移除克隆(同源零跳变) ----
+  clone.style.transition = 'none'
   heroTitle.classList.remove('handoff-pending')
   heroTitle.classList.add('is-landed')
-  void heroBrand.offsetWidth
-  flyers.forEach(({ cell }) => {
-    if (cell.parentNode) cell.parentNode.removeChild(cell)
-  })
-  if (el.parentNode) el.parentNode.removeChild(el)
+  void heroSvg.offsetWidth
+
+  await nextFrame()
+  clone.remove()
+  killPreloader(el)
   finishBoot(heroTitle)
 }
 
-function hidePreloader() {
-  const el = document.getElementById('preloader')
-  if (!el || el.dataset.done === '1') return
-
-  if (prefersReduced) {
-    el.dataset.done = '1'
-    el.classList.add('is-done', 'is-filling')
-    el.setAttribute('aria-hidden', 'true')
-    if (el.parentNode) el.parentNode.removeChild(el)
-    finishBoot(document.querySelector('.hero-title'))
-    return
-  }
-
-  handoffExit(el).catch(() => simpleExit(el))
+/* boot */
+syncInk()
+assertBrandSync()
+if (reduced) {
+  // reduced:不等字体竞态,即时呈现
+  wait(0).then(handoff)
+} else {
+  Promise.all([
+    Promise.race([(document.fonts && document.fonts.ready) || Promise.resolve(), wait(2000)]),
+    wait(DRAW_MS + 60),
+  ])
+    .then(handoff)
+    .catch(() => {
+      document.querySelectorAll('.pl-fly-svg').forEach((n) => n.remove())
+      killPreloader(document.getElementById('preloader'))
+      finishBoot(document.querySelector('.hero-title'))
+    })
 }
-
-const fontReady = (document.fonts && document.fonts.ready) || Promise.resolve()
-const cap = prefersReduced ? 600 : 2000
-const minDisplay = prefersReduced ? 0 : LINE_DRAW_MS + 120
-
-Promise.all([
-  Promise.race([fontReady, new Promise((r) => setTimeout(r, cap))]),
-  new Promise((r) => setTimeout(r, minDisplay)),
-]).then(hidePreloader)
