@@ -33,14 +33,14 @@
 [data-theme='light'] {
   --bg: #f5f2ec;
   --bg-2: #fffcfa;
-  --text: #3a3a3a;
+  --text: #525252;
   --text-dim: #7d7a75;
   --accent: #9fb4cc; /* 柔和灰蓝 */
   --accent-2: #d8a47f; /* 柔和桃 */
   --accent-text: #5c6f7f; /* 用于浅底上的强调文字 */
   --accent-soft: rgba(159, 180, 204, 0.16);
   --shadow-light: #ffffff;
-  --shadow-dark: #d7d4cc;
+  --shadow-dark: #e3e0d8;
   --ring: rgba(159, 180, 204, 0.5);
   color-scheme: light;
 }
@@ -265,6 +265,11 @@ h4 {
 .reveal.is-visible {
   opacity: 1;
   transform: none;
+}
+/* 开屏衔接后再点亮的模块(由 main.js 级联加 .is-visible) */
+.reveal-after-boot:not(.is-visible) {
+  opacity: 0;
+  transform: translateY(22px);
 }
 
 /* ---------- Helpers ---------- */

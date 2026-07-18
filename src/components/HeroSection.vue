@@ -1,13 +1,14 @@
 <template>
   <section id="hero" class="section hero" aria-label="首页">
     <div class="container hero-inner">
-      <h1 class="hero-title reveal">
+      <!-- 标题与开屏品牌衔接,不走普通 reveal,由 main.js handoff 落地 -->
+      <h1 class="hero-title handoff-pending">
         <span class="grad-text">daum12569</span>
       </h1>
-      <p class="hero-role reveal">用好奇心建造,用时间打磨</p>
+      <p class="hero-role reveal reveal-after-boot">用好奇心建造,用时间打磨</p>
 
       <div
-        class="hero-sig reveal"
+        class="hero-sig reveal reveal-after-boot"
         @mouseenter="pauseTimer"
         @mouseleave="resumeTimer"
         @focusin="pauseTimer"
@@ -24,7 +25,7 @@
         </button>
       </div>
 
-      <div class="hero-social reveal">
+      <div class="hero-social reveal reveal-after-boot">
         <a
           v-for="s in social"
           :key="s.url"
@@ -115,6 +116,21 @@ onUnmounted(() => timer && clearInterval(timer))
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
+}
+/* 交接前占位不可见;落地后立即显示(无淡入抢戏——飞行层已盖住同位) */
+.hero-title.handoff-pending .grad-text {
+  opacity: 0;
+}
+.hero-title.is-landed .grad-text {
+  opacity: 1;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-title.handoff-pending .grad-text,
+  .hero-title.is-landed .grad-text {
+    opacity: 1;
+    transition: none;
+  }
 }
 .hero-role {
   color: var(--text-dim);

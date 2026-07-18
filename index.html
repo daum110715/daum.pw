@@ -56,7 +56,7 @@
       --accent-2: #d8a47f;
       --accent-text: #5c6f7f;
       --shadow-light: #ffffff;
-      --shadow-dark: #d7d4cc;
+      --shadow-dark: #e3e0d8;
     }
     [data-theme='dark'] {
       --bg: #2b2e35;
@@ -76,47 +76,117 @@
       color: transparent;
     }
 
+    /* ---------- Preloader 入场 / 退场 ---------- */
     #preloader {
       position: fixed;
       inset: 0;
       z-index: 9999;
-      display: grid;
-      place-items: center;
-      padding: var(--pad);
-      background: var(--bg);
-      background-image: radial-gradient(circle at 50% 26%, var(--bg-2), var(--bg) 72%);
-      transition:
-        opacity 0.45s var(--ease),
-        transform 0.45s var(--ease),
-        visibility 0.45s var(--ease);
-      will-change: opacity, transform;
-    }
-    #preloader.is-done {
-      opacity: 0;
-      transform: scale(1.02);
-      visibility: hidden;
-      pointer-events: none;
-    }
-    .preloader__plate {
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 22px;
-      padding: clamp(28px, 6vw, 46px) clamp(34px, 8vw, 60px);
-      border-radius: var(--radius-lg);
-      background: var(--bg-2);
-      box-shadow:
-        var(--dist-lg) var(--dist-lg) var(--blur-lg) var(--shadow-dark),
-        calc(-1 * var(--dist-lg)) calc(-1 * var(--dist-lg)) var(--blur-lg) var(--shadow-light);
+      padding: var(--pad);
+      background: var(--bg);
+      background-image: radial-gradient(circle at 50% 26%, var(--bg-2), var(--bg) 72%);
+      will-change: opacity, transform, filter;
+      /* 入场:整幕从轻雾中凝聚 */
+      animation: pl-stage-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
-    .preloader__brand-svg {
+    @keyframes pl-stage-in {
+      from {
+        opacity: 0;
+        transform: scale(1.035);
+        filter: blur(10px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+      }
+    }
+    /* 退场(无衔接兜底):幕布放大消散 */
+    #preloader.is-done {
+      pointer-events: none;
+      animation: pl-stage-out 0.78s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    /* 衔接退场:品牌由 JS 飞向 Hero,幕布只做透明消散(不缩放抢戏) */
+    #preloader.is-done.is-handoff {
+      animation: pl-stage-handoff 0.72s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    @keyframes pl-stage-out {
+      0% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+        visibility: visible;
+      }
+      55% {
+        opacity: 0.55;
+        filter: blur(2px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(1.06);
+        filter: blur(12px);
+        visibility: hidden;
+      }
+    }
+    @keyframes pl-stage-handoff {
+      0% {
+        opacity: 1;
+        visibility: visible;
+      }
+      100% {
+        opacity: 0;
+        visibility: hidden;
+      }
+    }
+    /* 飞行层:与 Hero .grad-text 同系 */
+    .pl-brand-solid {
+      font-family: var(--font-display);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      white-space: nowrap;
+      user-select: none;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    /* 品牌 SVG:Outfit 800 字形轮廓(来自上次提交),描边行笔 → 填实 → 飞向 Hero */
+    .preloader__brand {
+      position: relative;
+      display: block;
       height: clamp(1.75rem, 7vw, 3.2rem);
       width: auto;
       overflow: visible;
+      transform-origin: center center;
+      animation: pl-brand-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+    }
+    @keyframes pl-brand-in {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    #preloader.is-done:not(.is-handoff) .preloader__brand {
+      animation: pl-brand-out 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    @keyframes pl-brand-out {
+      to {
+        opacity: 0;
+        transform: translateY(-18px) scale(1.04);
+        filter: blur(4px);
+      }
     }
     .pl-grad-start { stop-color: var(--accent-text); }
     .pl-grad-end { stop-color: var(--accent-2); }
-    /* 逐字描边书写:pathLength=1 归一化,dashoffset 1->0 沿字形轮廓描绘,完成后渐变填充 */
+    /* 逐字描边书写:pathLength=1 + dashoffset,写完填实(节奏同 fca14bf) */
     .pl-char-path {
       fill: url(#pl-grad);
       fill-opacity: 0;
@@ -134,53 +204,33 @@
       78% { stroke-dashoffset: 0; fill-opacity: 0; }
       100% { stroke-dashoffset: 0; fill-opacity: 1; }
     }
-    .preloader__hint {
-      margin: 0;
-      font-family: var(--font-display);
-      font-size: 0.85rem;
-      letter-spacing: 0.02em;
-      color: var(--text-dim);
-      opacity: 0;
-      animation: pl-fade 0.5s var(--ease) 0.6s forwards;
-    }
-    @keyframes pl-fade {
-      to { opacity: 1; }
-    }
-    .preloader__track {
-      width: min(220px, 60vw);
-      height: 8px;
-      border-radius: var(--radius-full);
-      background: var(--bg);
-      overflow: hidden;
-      box-shadow:
-        inset calc(var(--dist) * 0.6) calc(var(--dist) * 0.6) calc(var(--blur) * 0.6) var(--shadow-dark),
-        inset calc(var(--dist) * -0.6) calc(var(--dist) * -0.6) calc(var(--blur) * 0.6) var(--shadow-light);
-    }
-    .preloader__bar {
-      height: 100%;
-      width: 100%;
-      transform-origin: left center;
-      transform: scaleX(0);
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      animation: pl-bar 1.4s var(--ease) 0.2s forwards;
-    }
-    @keyframes pl-bar {
-      to { transform: scaleX(1); }
-    }
     @media (prefers-reduced-motion: reduce) {
-      #preloader { transition: opacity 0.01ms, transform 0.01ms, visibility 0.01ms; }
-      .pl-char-path { stroke-dashoffset: 0; fill-opacity: 1; animation: none; }
-      .preloader__hint { opacity: 1; animation: none; }
-      .preloader__bar { transform: scaleX(1); animation: none; }
+      #preloader,
+      #preloader.is-done,
+      .preloader__brand,
+      #preloader.is-done .preloader__brand {
+        animation: none !important;
+        filter: none !important;
+        transform: none !important;
+      }
+      #preloader { opacity: 1; }
+      #preloader.is-done {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.01ms, visibility 0.01ms;
+      }
+      .pl-char-path {
+        animation: none !important;
+        stroke-dashoffset: 0;
+        fill-opacity: 1;
+      }
     }
   </style>
 </head>
 <body aria-busy="true">
-  <!-- 首屏加载动画:Vue 挂载 + 字体就绪后由 main.js 平滑移除;4s 硬兜底防卡死 -->
-  <div id="preloader" role="progressbar" aria-label="正在加载 daum.pw">
-    <div class="preloader__plate">
-      <svg class="preloader__brand-svg" viewBox="0 0 5295.5 1260" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <!-- 首屏:Outfit 800 轮廓描边写出 → 填实 → 飞向 Hero(保留衔接) -->
+  <div id="preloader" role="status" aria-label="正在加载 daum.pw">
+      <svg class="preloader__brand" viewBox="0 0 5295.5 1260" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="pl-grad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" class="pl-grad-start"/>
@@ -199,9 +249,6 @@
           <path class="pl-char-path" style="--i:8" pathLength="1" transform="translate(4717 0)" d="M94 0L326 320L391 313Q376 289 360.5 271.5Q345 254 322.5 244Q300 234 262 234Q195 234 140.5 266Q86 298 53 351Q20 404 20 472Q20 542 55.5 598.5Q91 655 152 688Q213 721 289 721Q366 721 426.5 688Q487 655 522.5 599Q558 543 558 473Q558 386 498 297L295 0ZM289 366Q317 366 339.5 379Q362 392 374 415Q386 438 386 467Q386 496 374 519.5Q362 543 339.5 556Q317 569 289 569Q261 569 239 555.5Q217 542 204.5 519Q192 496 192 467Q192 438 204.5 415Q217 392 239 379Q261 366 289 366Z"/>
         </g>
       </svg>
-      <p class="preloader__hint">正在进入 daum.pw</p>
-      <div class="preloader__track" aria-hidden="true"><div class="preloader__bar"></div></div>
-    </div>
   </div>
 
   <div id="app"></div>
@@ -217,9 +264,10 @@
           el.classList.add('is-done');
           el.setAttribute('aria-hidden', 'true');
           document.body.setAttribute('aria-busy', 'false');
-          window.setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 550);
+          document.documentElement.classList.add('boot-done');
+          window.setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 900);
         }
-      }, 4000);
+      }, 4500);
     })();
   </script>
 </body>
