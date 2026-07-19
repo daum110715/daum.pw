@@ -48,7 +48,8 @@
           href="./legacy/"
           class="legacy-link"
           title="旧版站点"
-          @click.prevent="onEnterLegacy"
+          target="_blank"
+          rel="noopener"
         >
           <Icon icon="lucide:rotate-ccw" width="20" height="20" />
           <span>旧版</span>
@@ -64,15 +65,6 @@ import { Icon } from '@iconify/vue'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
 
-const emit = defineEmits(['enter-legacy'])
-
-// 点击「旧版」:取按钮内图标 svg 的几何,交给转场组件做克隆飞行
-function onEnterLegacy(e) {
-  const cur = e.currentTarget
-  const svg = cur.querySelector('svg')
-  const r = (svg || cur).getBoundingClientRect()
-  emit('enter-legacy', r)
-}
 </script>
 
 <style scoped>
