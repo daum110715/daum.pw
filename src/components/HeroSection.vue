@@ -43,16 +43,16 @@
             height="22"
           />
         </a>
-        <!-- 旧版站点入口:指向随站部署的 legacy 子站(./legacy/) -->
+        <!-- 旧版站点入口:宽框 + 图标 + 文字,指向随站部署的 legacy 子站(./legacy/) -->
         <a
           href="./legacy/"
-          class="social-icon"
-          aria-label="旧版站点"
+          class="legacy-link"
           title="旧版站点"
           target="_blank"
           rel="noopener"
         >
-          <Icon icon="lucide:history" width="22" height="22" />
+          <Icon icon="lucide:history" width="20" height="20" />
+          <span>旧版</span>
         </a>
       </div>
 
@@ -140,6 +140,33 @@ import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@
 .social-icon :deep(svg) {
   width: 22px;
   height: 22px;
+  overflow: visible;
+}
+/* 旧版入口:宽框 + 图标 + 文字,与 social-icon 同色系但形态区分 */
+.legacy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  white-space: nowrap;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+.legacy-link:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.legacy-link :deep(svg) {
+  width: 20px;
+  height: 20px;
   overflow: visible;
 }
 
