@@ -1,11 +1,12 @@
 <template>
   <ThemeToggle class="theme-floating reveal reveal-after-boot" />
-  <main>
+  <main :class="{ 'is-legacy-fading': legacyFading }">
     <HeroSection @enter-legacy="onEnterLegacy" />
   </main>
   <LegacyTransition
     ref="legacyRef"
     :active="legacyActive"
+    @fading="onLegacyFading"
     @exit="legacyActive = false"
   />
 </template>
@@ -20,15 +21,25 @@ import { useReveal } from '@/composables/useReveal'
 useReveal()
 
 const legacyActive = ref(false)
+const legacyFading = ref(false)
 const legacyRef = ref(null)
 
 function onEnterLegacy(rect) {
   legacyActive.value = true
   legacyRef.value?.enter(rect)
 }
+function onLegacyFading(v) {
+  legacyFading.value = v
+}
 </script>
 
 <style scoped>
+main {
+  transition: opacity 0.6s var(--ease);
+}
+main.is-legacy-fading {
+  opacity: 0;
+}
 .theme-floating {
   position: fixed;
   top: 18px;

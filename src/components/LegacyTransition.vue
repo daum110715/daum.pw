@@ -6,7 +6,7 @@
       :class="`is-${phase}`"
       :aria-hidden="phase === 'idle' ? 'true' : undefined"
     >
-      <!-- 旧版 iframe(下层,幕布淡出后露出) -->
+      <!-- 旧版 iframe:全屏,平滑淡入(与新版 main 淡出交叉,无遮罩) -->
       <iframe
         ref="iframeEl"
         class="legacy-iframe"
@@ -15,14 +15,10 @@
         @load="onIframeLoad"
       />
 
-      <!-- 幕布层:clip-path 扩散铺满,reveal 时整体淡出 -->
-      <div ref="curtainEl" class="legacy-curtain" :style="curtainStyle">
-        <div ref="faceEl" class="legacy-curtain-face" :style="faceStyle" />
-      </div>
-
-      <!-- 克隆自按钮的图标:放大飞向屏幕中心,自身持续 spin -->
+      <!-- 克隆自按钮的图标:旋转放大飞向屏幕中心,自身持续 spin -->
       <span
         v-if="phase === 'enter' || phase === 'cover' || phase === 'reveal'"
+        ref="flyIconEl"
         class="legacy-fly-icon"
         :style="iconStyle"
       >
@@ -43,11 +39,10 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 
 defineProps({ active: Boolean })
-const emit = defineEmits(['exit'])
+const emit = defineEmits(['exit', 'fading'])
 
-// 与 main.js 开屏动画同源缓动:回弹 ease-out + smooth 无折点
+// 与 main.js 开屏动画同源回弹缓动
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
-const SMOOTH = 'cubic-bezier(0.45, 0.05, 0.25, 1)'
 const reduced =
   typeof window !== 'undefined' &&
   window.matchMedia &&
@@ -57,18 +52,15 @@ const reduced =
 // (reduced/后台: idle -> loading -> done)
 const phase = ref('idle')
 const iframeSrc = ref('')
-const curtainStyle = ref({})
-const faceStyle = ref({})
 const iconStyle = ref({})
 const iframeEl = ref(null)
-const curtainEl = ref(null)
-const faceEl = ref(null)
+const flyIconEl = ref(null)
 
 let savedOverflow = ''
 let loadResolver = null
 let loadDone = false
 
-/** 下一帧:rAF 为主,setTimeout 兜底(后台标签页 rAF 暂停仍能推进) */
+/** 下一帧:rAF 为主,setTimeout 兜底 */
 function nextFrame() {
   return new Promise((r) => {
     let done = false
@@ -82,7 +74,7 @@ function nextFrame() {
   })
 }
 
-/** transitionend + setTimeout 双保险(同 main.js onTransformEnd) */
+/** transitionend + setTimeout 双保险 */
 function onTransitionEnd(el, prop, timeout) {
   return new Promise((resolve) => {
     if (!el) return resolve()
@@ -133,17 +125,13 @@ async function enter(rect) {
   // reduced-motion / 后台标签页:跳过动画,等加载后直接呈现
   if (reduced || document.hidden) {
     phase.value = 'loading'
+    emit('fading', true)
     await waitForLoad()
     phase.value = 'done'
     return
   }
 
-  const cx = rect.left + rect.width / 2
-  const cy = rect.top + rect.height / 2
-
-  // 初始态:幕布缩为图标位置的圆点,图标克隆至按钮图标位
-  curtainStyle.value = { clipPath: `circle(0px at ${cx}px ${cy}px)`, transition: 'none' }
-  faceStyle.value = { opacity: '1', transition: 'none' }
+  // 图标克隆到按钮位,旋转放大飞向屏幕中心(自身持续 spin)
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
@@ -157,19 +145,12 @@ async function enter(rect) {
   await nextTick()
   await nextFrame()
 
-  // cover:幕布圆形扩散铺满 + 图标放大飞向屏幕中心(图标自身持续 spin)
   const vw = window.innerWidth
   const vh = window.innerHeight
   const target = Math.min(vw, vh) * 0.2
   const tx = vw / 2 - target / 2 - rect.left
   const ty = vh / 2 - target / 2 - rect.top
   const scale = rect.width > 0 ? target / rect.width : 1
-  // 对角线 1.1 倍:偏心扩散(从按钮位)也能覆盖到最远角
-  const coverR = Math.hypot(vw, vh) * 1.1
-  curtainStyle.value = {
-    clipPath: `circle(${coverR}px at ${cx}px ${cy}px)`,
-    transition: `clip-path 0.5s ${SMOOTH}`,
-  }
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
@@ -181,15 +162,18 @@ async function enter(rect) {
   }
   phase.value = 'cover'
 
-  // 幕布铺满 与 iframe 加载 并行,都完成才过渡
-  await Promise.all([onTransitionEnd(curtainEl.value, 'clip-path', 700), waitForLoad()])
+  // 图标飞到位 与 iframe 加载 并行,都完成才交叉过渡
+  await Promise.all([
+    onTransitionEnd(flyIconEl.value, 'transform', 600),
+    waitForLoad(),
+  ])
 
-  // reveal:图标持续旋转,幕布+图标平滑淡出,露出旧版(无 3D 翻转)
+  // reveal:通知新版 main 淡出 + 旧版 iframe 平滑淡入 + 图标淡出(三者同步交叉,无遮罩)
   phase.value = 'reveal'
-  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: `opacity 0.5s ${SMOOTH}` }
-  faceStyle.value = { opacity: '0', transition: 'opacity 0.6s var(--ease)' }
+  emit('fading', true)
+  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.5s var(--ease)' }
   await nextTick()
-  await onTransitionEnd(faceEl.value, 'opacity', 700)
+  await onTransitionEnd(iframeEl.value, 'opacity', 700)
 
   phase.value = 'done'
 }
@@ -197,6 +181,7 @@ async function enter(rect) {
 function exit() {
   if (phase.value === 'idle' || phase.value === 'closing') return
   phase.value = 'closing'
+  emit('fading', false) // 新版 main 同步淡入恢复
   window.setTimeout(() => {
     reset()
     emit('exit')
@@ -206,8 +191,6 @@ function exit() {
 function reset() {
   phase.value = 'idle'
   iframeSrc.value = ''
-  curtainStyle.value = {}
-  faceStyle.value = {}
   iconStyle.value = {}
   document.body.style.overflow = savedOverflow
   loadDone = false
@@ -227,7 +210,7 @@ defineExpose({ enter })
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: var(--bg); /* iframe 淡入中间态兜底,不透到新版页面 */
+  /* 透明:不遮新版,让新版 main 淡出 + 旧版 iframe 淡入交叉过渡(无遮罩) */
 }
 .legacy-iframe {
   position: absolute;
@@ -236,31 +219,12 @@ defineExpose({ enter })
   height: 100%;
   border: 0;
   background: var(--bg);
-  z-index: 1;
   opacity: 0;
   transition: opacity 0.6s var(--ease);
 }
-/* reveal/done:旧版内容平滑淡入(与幕布淡出同步) */
 .legacy-stage.is-reveal .legacy-iframe,
 .legacy-stage.is-done .legacy-iframe {
   opacity: 1;
-}
-.legacy-curtain {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-}
-/* 幕布背景:与 neu.css body 同款多层暖色光斑,延续当前页面背景(非纯色橙) */
-.legacy-curtain-face {
-  position: absolute;
-  inset: 0;
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%),
-    radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%),
-    radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%),
-    radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
 }
 .legacy-fly-icon {
   position: fixed;
@@ -276,7 +240,7 @@ defineExpose({ enter })
   width: 100%;
   height: 100%;
 }
-/* 图标持续旋转:外层 fly-icon 管 translate+scale,内层 svg 管 spin,互不干扰 */
+/* 外层 fly-icon 管 translate+scale,内层 svg 管 spin,两层 transform 互不干扰 */
 .legacy-fly-icon :deep(.legacy-spin) {
   animation: legacy-spin 1.1s linear infinite;
   transform-origin: 50% 50%;
@@ -310,13 +274,6 @@ defineExpose({ enter })
 .legacy-back:hover {
   transform: translateY(-2px);
   background: var(--accent-soft);
-}
-/* done 态幕布退场,reduced 路径 loading 不显示幕布 */
-.legacy-stage.is-done .legacy-curtain {
-  display: none;
-}
-.legacy-stage.is-loading .legacy-curtain {
-  display: none;
 }
 .legacy-stage.is-closing {
   opacity: 0;
