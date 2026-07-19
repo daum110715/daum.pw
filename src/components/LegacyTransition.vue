@@ -14,32 +14,6 @@
         @load="onIframeLoad"
       />
 
-      <!-- 品牌字 daum12569 SVG:描边填实(复刻开屏 pl-draw),过渡视觉锚点 -->
-      <svg
-        v-if="phase !== 'idle' && phase !== 'done'"
-        class="legacy-brand"
-        :viewBox="BRAND_VIEWBOX"
-        aria-hidden="true"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id="legacyBrandGrad" x1="0" y1="0" x2="5295.5" y2="0" gradientUnits="userSpaceOnUse">
-            <stop offset="0" class="g-stop-1" />
-            <stop offset="1" class="g-stop-2" />
-          </linearGradient>
-        </defs>
-        <g :transform="BRAND_GROUP_TRANSFORM">
-          <path
-            v-for="(p, i) in BRAND_PATHS"
-            :key="i"
-            class="legacy-brand-path"
-            :d="p.d"
-            :style="{ '--i': i }"
-            pathLength="1"
-          />
-        </g>
-      </svg>
-
       <!-- 转圈图标:在「旧版」按钮与「返回新版」按钮两地之间平滑移动,自身持续 spin -->
       <span
         v-if="phase !== 'idle' && phase !== 'done'"
@@ -62,7 +36,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
-import { BRAND_PATHS, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM } from '@/data/brandGlyph'
 
 const emit = defineEmits(['fading'])
 
@@ -183,7 +156,7 @@ async function enter(rect) {
     opacity: '1',
     transition: 'none',
   }
-  // 同步触发:品牌字描边填实 + 图标从旧版按钮位飞向返回按钮位 + main/iframe opacity 交叉
+  // 同步触发:图标从旧版按钮位飞向返回按钮位 + main/iframe opacity 交叉(无遮罩)
   phase.value = 'enter'
   emit('fading', true) // main 淡出
   await nextTick()
@@ -237,7 +210,7 @@ async function exit(event) {
     opacity: '1',
     transition: 'none',
   }
-  // 同步触发:品牌字描边填实 + 图标从返回按钮位飞回旧版按钮位 + iframe 淡出/main 淡入
+  // 同步触发:图标从返回按钮位飞回旧版按钮位 + iframe 淡出/main 淡入
   phase.value = 'returning'
   emit('fading', false) // main 淡入
   await nextTick()
@@ -321,55 +294,9 @@ defineExpose({ enter })
 .legacy-stage.is-done .legacy-iframe {
   opacity: 1;
 }
-/* 品牌字 SVG:屏幕中心,描边填实(复刻 index.html pl-draw),reveal/returning-out 时淡出 */
-.legacy-brand {
-  position: fixed;
-  z-index: 3;
-  left: 50%;
-  top: 50%;
-  height: clamp(2rem, 8vw, 4rem);
-  width: auto;
-  transform: translate(-50%, -50%);
-  overflow: visible;
-  pointer-events: none;
-  transition: opacity 0.4s var(--ease);
-}
-.legacy-stage.is-reveal .legacy-brand,
-.legacy-stage.is-returning-out .legacy-brand {
-  opacity: 0;
-}
-.legacy-brand-path {
-  fill: url(#legacyBrandGrad);
-  fill-opacity: 0;
-  stroke: color-mix(in srgb, var(--accent) 55%, white);
-  stroke-width: 40;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: legacy-brand-draw 0.5s var(--ease) forwards;
-  animation-delay: calc(var(--i) * 0.05s);
-}
-@keyframes legacy-brand-draw {
-  0% {
-    stroke-dashoffset: 1;
-    fill-opacity: 0;
-    stroke-width: 40;
-  }
-  72% {
-    stroke-dashoffset: 0;
-    fill-opacity: 0;
-    stroke-width: 40;
-  }
-  100% {
-    stroke-dashoffset: 0;
-    fill-opacity: 1;
-    stroke-width: 0;
-  }
-}
 .legacy-fly-icon {
   position: fixed;
-  z-index: 4; /* 图标在品牌字之上 */
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -418,12 +345,6 @@ defineExpose({ enter })
   background: var(--accent-soft);
 }
 @media (prefers-reduced-motion: reduce) {
-  .legacy-brand-path {
-    animation: none;
-    stroke-dashoffset: 0;
-    fill-opacity: 1;
-    stroke-width: 0;
-  }
   .legacy-fly-icon :deep(.legacy-spin) {
     animation: none;
   }
