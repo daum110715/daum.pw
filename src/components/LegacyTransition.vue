@@ -14,9 +14,9 @@
         @load="onIframeLoad"
       />
 
-      <!-- 品牌字 daum12569 SVG:描边填实(复刻开屏 pl-draw),过渡视觉锚点 -->
+      <!-- 品牌字 daum12569 SVG:描边填实(复刻开屏 pl-draw),进/出过渡视觉锚点 -->
       <svg
-        v-if="phase === 'enter' || phase === 'cover' || phase === 'reveal'"
+        v-if="phase !== 'idle' && phase !== 'done'"
         class="legacy-brand"
         :viewBox="BRAND_VIEWBOX"
         aria-hidden="true"
@@ -36,7 +36,7 @@
 
       <!-- 克隆自按钮的图标:旋转放大飞向屏幕中心,自身持续 spin -->
       <span
-        v-if="phase === 'enter' || phase === 'cover' || phase === 'reveal'"
+        v-if="phase !== 'idle' && phase !== 'done'"
         ref="flyIconEl"
         class="legacy-fly-icon"
         :style="iconStyle"
@@ -45,7 +45,7 @@
       </span>
 
       <!-- 返回新版 -->
-      <button v-if="phase === 'done'" class="legacy-back" type="button" @click="exit">
+      <button v-if="phase === 'done'" class="legacy-back" type="button" @click="exit($event)">
         <Icon icon="lucide:arrow-left" width="18" height="18" />
         <span>返回新版</span>
       </button>
@@ -67,7 +67,7 @@ const reduced =
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// idle -> enter -> cover -> reveal -> done -> closing -> idle
+// idle -> enter -> cover -> reveal -> done -> returning -> returning-out -> idle
 const phase = ref('idle')
 const iframeSrc = ref('')
 const iconStyle = ref({})
@@ -133,6 +133,17 @@ function waitForLoad(timeout = 8000) {
   })
 }
 
+/** 计算图标从 origin rect 飞向屏幕中心的终态 transform */
+function flyToCenter(originLeft, originTop, originW, originH) {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const target = Math.min(vw, vh) * 0.12
+  const tx = vw / 2 - target / 2 - originLeft
+  const ty = vh / 2 - target / 2 - originTop
+  const scale = originW > 0 ? target / originW : 1
+  return { target, tx, ty, scale }
+}
+
 async function enter(rect) {
   if (phase.value !== 'idle') return
   savedOverflow = document.body.style.overflow
@@ -147,7 +158,7 @@ async function enter(rect) {
     return
   }
 
-  // 图标克隆到按钮位
+  // 图标克隆到按钮位(旧版按钮)
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
@@ -163,13 +174,7 @@ async function enter(rect) {
   await nextTick()
   await nextFrame()
 
-  // 图标旋转放大飞向屏幕中心(与品牌字叠加,自身持续 spin)
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const target = Math.min(vw, vh) * 0.12
-  const tx = vw / 2 - target / 2 - rect.left
-  const ty = vh / 2 - target / 2 - rect.top
-  const scale = rect.width > 0 ? target / rect.width : 1
+  const { tx, ty, scale } = flyToCenter(rect.left, rect.top, rect.width, rect.height)
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
@@ -198,13 +203,57 @@ async function enter(rect) {
   phase.value = 'done'
 }
 
-function exit() {
-  if (phase.value === 'idle' || phase.value === 'closing') return
-  phase.value = 'closing'
-  emit('fading', false) // main 淡入恢复
-  window.setTimeout(() => {
-    reset()
-  }, 420)
+/** 返回新版:enter 的反向(品牌字描边 + 图标从返回按钮飞中心 + iframe 淡出/main 淡入交叉) */
+async function exit(event) {
+  if (phase.value !== 'done') return
+  // 图标从"返回新版"按钮位飞中心(Esc 无 event,从屏幕中心起)
+  const rect = event?.currentTarget?.getBoundingClientRect?.()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const target = Math.min(vw, vh) * 0.12
+  const originLeft = rect ? rect.left : vw / 2 - target / 2
+  const originTop = rect ? rect.top : vh / 2 - target / 2
+  const originW = rect ? rect.width : target
+  const originH = rect ? rect.height : target
+
+  iconStyle.value = {
+    left: originLeft + 'px',
+    top: originTop + 'px',
+    width: originW + 'px',
+    height: originH + 'px',
+    transform: 'translate(0px, 0px) scale(1)',
+    opacity: '1',
+    transition: 'none',
+  }
+  // 同步触发:品牌字描边填实 + 图标飞中心 + iframe 淡出 + main 淡入(反向交叉)
+  phase.value = 'returning'
+  emit('fading', false) // main 淡入
+  await nextTick()
+  await nextFrame()
+
+  const { tx, ty, scale } = flyToCenter(originLeft, originTop, originW, originH)
+  iconStyle.value = {
+    left: originLeft + 'px',
+    top: originTop + 'px',
+    width: originW + 'px',
+    height: originH + 'px',
+    transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+    opacity: '1',
+    transition: `transform 0.5s ${EASE}`,
+  }
+
+  // 图标飞到位 与 iframe 淡出 并行;品牌字描边填实同步
+  await Promise.all([
+    onTransitionEnd(flyIconEl.value, 'transform', 600),
+    onTransitionEnd(iframeEl.value, 'opacity', 700),
+  ])
+
+  // returning-out:品牌字 + 图标淡出
+  phase.value = 'returning-out'
+  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.4s var(--ease)' }
+  await onTransitionEnd(flyIconEl.value, 'opacity', 500)
+
+  reset()
 }
 
 function reset() {
@@ -250,13 +299,14 @@ defineExpose({ enter })
   opacity: 0;
   transition: opacity 0.6s var(--ease); /* 纯 opacity 交叉,无 scale(避免 iframe 位图缩放模糊) */
 }
+/* 进过渡:iframe 淡入;done 全显;返回过渡(returning/returning-out):iframe 淡出(默认 opacity 0) */
 .legacy-stage.is-enter .legacy-iframe,
 .legacy-stage.is-cover .legacy-iframe,
 .legacy-stage.is-reveal .legacy-iframe,
 .legacy-stage.is-done .legacy-iframe {
   opacity: 1;
 }
-/* 品牌字 SVG:屏幕中心,描边填实(复刻 index.html pl-draw),reveal 时淡出 */
+/* 品牌字 SVG:屏幕中心,描边填实(复刻 index.html pl-draw),reveal/returning-out 时淡出 */
 .legacy-brand {
   position: fixed;
   z-index: 3;
@@ -269,7 +319,8 @@ defineExpose({ enter })
   pointer-events: none;
   transition: opacity 0.4s var(--ease);
 }
-.legacy-stage.is-reveal .legacy-brand {
+.legacy-stage.is-reveal .legacy-brand,
+.legacy-stage.is-returning-out .legacy-brand {
   opacity: 0;
 }
 .legacy-brand-path {
@@ -350,14 +401,7 @@ defineExpose({ enter })
   transform: translateY(-2px);
   background: var(--accent-soft);
 }
-.legacy-stage.is-closing {
-  opacity: 0;
-  transition: opacity 0.4s var(--ease);
-}
 @media (prefers-reduced-motion: reduce) {
-  .legacy-stage.is-closing {
-    transition: none;
-  }
   .legacy-brand-path {
     animation: none;
     stroke-dashoffset: 0;
