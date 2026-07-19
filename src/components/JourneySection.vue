@@ -19,7 +19,7 @@
           <NeuCard tag="article" class="timeline-card">
             <p class="timeline-period">{{ item.period }}</p>
             <h3 class="timeline-title">{{ item.title }}</h3>
-            <p class="timeline-desc text-dim">{{ item.desc }}</p>
+            <p v-if="item.desc" class="timeline-desc text-dim">{{ item.desc }}</p>
           </NeuCard>
         </li>
       </ol>

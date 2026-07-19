@@ -27,8 +27,6 @@
         </svg>
         <span class="visually-hidden">{{ BRAND_TEXT }}</span>
       </h1>
-      <p class="hero-role reveal reveal-after-boot">用好奇心建造,用时间打磨</p>
-
       <div class="hero-social reveal reveal-after-boot">
         <a
           v-for="s in social"
@@ -105,12 +103,6 @@ import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@
     transition: none;
   }
 }
-.hero-role {
-  color: var(--text-dim);
-  font-size: clamp(1rem, 2.5vw, 1.2rem);
-  font-family: var(--font-display);
-}
-
 .hero-social {
   display: flex;
   gap: 12px;
