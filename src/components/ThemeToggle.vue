@@ -6,21 +6,13 @@
     @click="toggleWithTransition"
   >
     <span class="track">
-      <span class="thumb" :data-pos="theme">
-        <Icon
-          class="icon"
-          :icon="theme === 'light' ? 'ph:sun-thin' : 'ph:moon-thin'"
-          width="14"
-          height="14"
-        />
-      </span>
+      <span class="thumb" :data-pos="theme" />
     </span>
   </button>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
 import { useTheme } from '@/composables/useTheme'
 
 const { theme, toggle, set } = useTheme()
@@ -85,10 +77,6 @@ function toggleWithTransition() {
 }
 .thumb[data-pos='dark'] {
   transform: translateX(30px);
-}
-.icon {
-  width: 14px;
-  height: 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {
