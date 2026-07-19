@@ -13,7 +13,7 @@
         @load="onIframeLoad"
       />
 
-      <!-- morphing path:箭头 <-> 尾线 <-> 箭头,外层 svg 管位移,内层 path 管 d 变形 + done spin -->
+      <!-- morphing path:箭头(rotate-ccw) <-> 尾线 <-> 箭头,flubber 自动插值 -->
       <svg
         v-if="phase !== 'idle'"
         class="legacy-fly-icon"
@@ -33,10 +33,10 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { interpolate } from 'flubber'
 
 const emit = defineEmits(['fading'])
 
-const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const reduced =
   typeof window !== 'undefined' &&
   window.matchMedia &&
@@ -46,10 +46,14 @@ const reduced =
 const RETURN_CENTER = { x: 46, y: 42 }
 const FLY_SIZE = 40
 
-// 箭头 path(rotate-ccw 简化,M/L,弧用 L 近似,9 节点 2M+7L)
-const ARROW = 'M3 3 L3 8 L8 8 M3 12 L6 6 L9 4 L12 3 L3 8'
-// 尾线 path(水平线,9 节点 2M+7L,与 ARROW 同结构便于插值)
-const TRAIL = 'M3 12 L6 12 L9 12 M12 12 L15 12 L18 12 L21 12 L24 12'
+// 箭头 path:rotate-ccw 精确(含 A 命令弧),绝对坐标,合并单 path
+const ARROW = 'M3 12 A9 9 0 1 0 12 3 A9.75 9.75 0 0 0 5.26 5.74 L3 8 M3 3 L3 8 L8 8'
+// 尾线 path:24x24 内弧线(代表拖尾线条形态),flubber 自动与 ARROW 插值
+const TRAIL = 'M3 12 Q12 0 21 12'
+
+// flubber 预建插值器(自动采样 A 命令,不同节点可插值)
+const toTrail = interpolate(ARROW, TRAIL)
+const toArrow = interpolate(TRAIL, ARROW)
 
 const phase = ref('idle')
 const iframeSrc = ref('')
@@ -115,32 +119,12 @@ function waitForLoad(timeout = 8000) {
   })
 }
 
-/** 解析 M/L path 为节点数组 */
-function parseNodes(d) {
-  const nodes = []
-  const re = /([ML])\s*(-?[\d.]+)[\s,]+(-?[\d.]+)/g
-  let m
-  while ((m = re.exec(d))) nodes.push({ cmd: m[1], x: +m[2], y: +m[3] })
-  return nodes
-}
-
 function lerp(a, b, t) {
   return a + (b - a) * t
 }
 
-/** 缓动:回弹 ease-out */
 function easeOut(t) {
   return 1 - Math.pow(1 - t, 3)
-}
-
-/** M/L path 插值(节点结构一致) */
-const ARROW_NODES = parseNodes(ARROW)
-const TRAIL_NODES = parseNodes(TRAIL)
-
-function interpolatePath(fromNodes, toNodes, t) {
-  return fromNodes
-    .map((n, i) => `${n.cmd} ${lerp(n.x, toNodes[i].x, t).toFixed(2)} ${lerp(n.y, toNodes[i].y, t).toFixed(2)}`)
-    .join(' ')
 }
 
 /** morphing + 位移:rAF 驱动,箭头(起点) -> 尾线 -> 箭头(终点) */
@@ -151,12 +135,7 @@ function runMorph(sx, sy, ex, ey, duration) {
     function frame(now) {
       const p = Math.min(1, (now - start) / duration)
       const t = easeOut(p)
-      let d
-      if (p < 0.5) {
-        d = interpolatePath(ARROW_NODES, TRAIL_NODES, p * 2)
-      } else {
-        d = interpolatePath(TRAIL_NODES, ARROW_NODES, (p - 0.5) * 2)
-      }
+      const d = p < 0.5 ? toTrail(p * 2) : toArrow((p - 0.5) * 2)
       morphD.value = d
       const x = lerp(sx, ex, t) - FLY_SIZE / 2
       const y = lerp(sy, ey, t) - FLY_SIZE / 2
@@ -282,7 +261,6 @@ defineExpose({ enter })
 .legacy-stage.is-done .legacy-iframe {
   opacity: 1;
 }
-/* morphing path 容器:外层管位移 */
 .legacy-fly-icon {
   position: fixed;
   z-index: 6;
@@ -300,7 +278,6 @@ defineExpose({ enter })
   stroke-linejoin: round;
   transform-origin: 50% 50%;
 }
-/* done 时箭头持续 spin(逆时针) */
 .legacy-stage.is-done .legacy-fly-path {
   animation: legacy-spin 1.1s linear infinite;
 }
@@ -309,7 +286,6 @@ defineExpose({ enter })
     transform: rotate(-360deg);
   }
 }
-/* 返回新版:与 legacy-link 同款 */
 .legacy-back {
   position: fixed;
   top: 18px;
