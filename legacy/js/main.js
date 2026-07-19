@@ -530,7 +530,8 @@ const MobileNav = {
    ======================================== */
 
 const DataLoader = {
-  baseUrl: '/api/data',
+  // 相对路径:静态部署(GitHub Pages)下从 ./data/ 加载,无需 server.js 后端
+  baseUrl: 'data',
   timeoutMs: 5000,
 
   async fetchJSON(name) {
