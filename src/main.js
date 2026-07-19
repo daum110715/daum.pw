@@ -39,6 +39,8 @@ const reduced =
 
 const MOVE_MS = 780
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+/** 进度条 → 主题切换按钮 变形时长 */
+const MORPH_MS = 620
 /** 与 index.html pl-draw 一致: 0.15 + 8×0.1 + 0.5 */
 const DRAW_MS = 150 + 800 + 500
 
@@ -56,6 +58,18 @@ const nextFrame = () =>
     requestAnimationFrame(fin)
     window.setTimeout(fin, 50)
   })
+
+/** 进度条推进:首次接管先同步 CSS animation 当前值再清掉,避免跳回 0 */
+function setProgress(fill, ratio) {
+  if (!fill) return
+  if (fill.style.animation !== 'none') {
+    const cur = getComputedStyle(fill).width
+    fill.style.animation = 'none'
+    fill.style.width = cur
+    void fill.offsetWidth
+  }
+  fill.style.width = (ratio * 100).toFixed(1) + '%'
+}
 
 function brandInk() {
   return (
@@ -78,7 +92,8 @@ function syncInk() {
   return ink
 }
 
-/** 共享收尾:揭示 Hero 标题 + 级联 reveal-after-boot。挂 window 供 index.html 兜底复用 */
+/** 共享收尾:揭示 Hero 标题 + 级联 reveal-after-boot。挂 window 供 index.html 兜底复用。
+    主题切换按钮(.theme-floating)不在此级联:正常路径由进度条变形归位后 revealToggle 点亮 */
 function finishBoot(heroTitle) {
   document.documentElement.classList.add('boot-done')
   document.body.setAttribute('aria-busy', 'false')
@@ -86,12 +101,29 @@ function finishBoot(heroTitle) {
     heroTitle.classList.remove('handoff-pending')
     heroTitle.classList.add('is-landed')
   }
-  document.querySelectorAll('.reveal-after-boot:not(.is-visible)').forEach((node, i) => {
-    window.setTimeout(() => node.classList.add('is-visible'), 80 + i * 90)
-  })
+  document
+    .querySelectorAll('.reveal-after-boot:not(.is-visible):not(.theme-floating)')
+    .forEach((node, i) => {
+      window.setTimeout(() => node.classList.add('is-visible'), 80 + i * 90)
+    })
+}
+/** 点亮主题切换按钮。instant:跳过 .reveal 过渡立即呈现——
+    变形接管时假进度条正盖在同位,必须瞬亮后下一帧撤假条才零跳变 */
+function revealToggle(instant) {
+  const t = document.querySelector('.theme-floating.reveal-after-boot')
+  if (!t || t.classList.contains('is-visible')) return
+  if (!instant) {
+    t.classList.add('is-visible')
+    return
+  }
+  t.style.transition = 'none'
+  t.classList.add('is-visible')
+  void t.offsetWidth
+  t.style.transition = ''
 }
 window.__finishBoot = function () {
   finishBoot(document.querySelector('.hero-title'))
+  revealToggle()
 }
 
 function killPreloader(el) {
@@ -158,6 +190,7 @@ async function handoff() {
   // guard:已被兜底处理 → 仍要揭示 Hero(修原 guard 静默 return 致永久隐形)
   if (!el || el.dataset.done === '1') {
     finishBoot(heroTitle)
+    revealToggle()
     return
   }
 
@@ -165,16 +198,19 @@ async function handoff() {
   if (reduced || document.hidden) {
     killPreloader(el)
     finishBoot(heroTitle)
+    revealToggle()
     return
   }
 
   const brand = document.getElementById('preloader-brand-svg')
   const heroSvg = document.querySelector('.hero-brand-svg')
   const paths = [...el.querySelectorAll('.pl-char-path')]
+  const progFill = el.querySelector('.preloader__progress-fill')
 
   if (!heroTitle || !heroSvg || !brand || paths.length < 9) {
     killPreloader(el)
     finishBoot(heroTitle)
+    revealToggle()
     return
   }
 
@@ -185,6 +221,7 @@ async function handoff() {
 
   // ---- A. 描边完成态 ----
   finishDraw(paths, ink)
+  setProgress(progFill, 0.7)
   void brand.offsetWidth
   await nextFrame()
 
@@ -193,6 +230,7 @@ async function handoff() {
   if (pre.width < 2 || pre.height < 2) {
     killPreloader(el)
     finishBoot(heroTitle)
+    revealToggle()
     return
   }
 
@@ -228,6 +266,7 @@ async function handoff() {
   clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
   await nextFrame()
   clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+  setProgress(progFill, 0.85)
 
   await onTransformEnd(clone, MOVE_MS + 200)
 
@@ -239,8 +278,63 @@ async function handoff() {
 
   await nextFrame()
   clone.remove()
+
+  // ---- E. 进度条走满 → 变形为主题切换按钮(轨道同高同色、填充同色) ----
+  const prog = el.querySelector('.preloader__progress')
+  const fill = prog && prog.querySelector('.preloader__progress-fill')
+  const toggleEl = document.querySelector('.theme-floating')
+  const track = toggleEl && toggleEl.querySelector('.track')
+  const thumb = toggleEl && toggleEl.querySelector('.thumb')
+
+  if (!(prog && fill && track && thumb)) {
+    killPreloader(el)
+    finishBoot(heroTitle)
+    revealToggle()
+    return
+  }
+
+  // 提升到 body 并锁定当前视觉位置(preloader 随即移除,进度条不受影响)
+  const pRect = prog.getBoundingClientRect()
+  document.body.appendChild(prog)
+  prog.style.position = 'fixed'
+  prog.style.left = pRect.left + 'px'
+  prog.style.top = pRect.top + 'px'
+  prog.style.width = pRect.width + 'px'
+  prog.style.height = pRect.height + 'px'
+  prog.style.margin = '0'
+  prog.style.zIndex = '10003'
+
+  setProgress(fill, 1)
   killPreloader(el)
   finishBoot(heroTitle)
+
+  await wait(400) // 等填充走满(0.35s transition)
+
+  // 变形:长条 → 64px 轨道,填充 → thumb 圆,同时平移到按钮位。
+  // 目标形态直接量真按钮(rect 不受 opacity 影响),亮/暗拇指位自动一致。
+  const trackRect = track.getBoundingClientRect()
+  const thumbRect = thumb.getBoundingClientRect()
+  const fillRect = fill.getBoundingClientRect()
+  fill.style.width = fillRect.width + 'px'
+  fill.style.height = fillRect.height + 'px'
+  void fill.offsetWidth
+
+  prog.style.transition = `left ${MORPH_MS}ms ${EASE}, top ${MORPH_MS}ms ${EASE}, width ${MORPH_MS}ms ${EASE}`
+  fill.style.transition = `width ${MORPH_MS}ms ${EASE}, height ${MORPH_MS}ms ${EASE}, margin ${MORPH_MS}ms ${EASE}`
+  prog.style.left = trackRect.left + 'px'
+  prog.style.top = trackRect.top + 'px'
+  prog.style.width = trackRect.width + 'px'
+  fill.style.width = thumbRect.width + 'px'
+  fill.style.height = thumbRect.height + 'px'
+  fill.style.marginLeft = thumbRect.left - trackRect.left + 'px'
+  fill.style.marginTop = thumbRect.top - trackRect.top + 'px'
+
+  await wait(MORPH_MS + 120)
+
+  // 真按钮在假进度条正下方同位同形瞬亮,下一帧移除假进度条(零跳变)
+  revealToggle(true)
+  await nextFrame()
+  prog.remove()
 }
 
 /* boot */
@@ -257,7 +351,9 @@ if (reduced) {
     .then(handoff)
     .catch(() => {
       document.querySelectorAll('.pl-fly-svg').forEach((n) => n.remove())
+      document.querySelectorAll('body > .preloader__progress').forEach((n) => n.remove())
       killPreloader(document.getElementById('preloader'))
       finishBoot(document.querySelector('.hero-title'))
+      revealToggle()
     })
 }

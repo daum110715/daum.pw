@@ -109,8 +109,10 @@
       inset: 0;
       z-index: 9999;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: clamp(22px, 4.5vh, 36px);
       padding: var(--pad);
       /* 背景与 neu.css body 完全一致(含 background-attachment: fixed):
          preloader 显示/隐藏时背景视觉完全相同,硬切零跳变--
@@ -139,6 +141,28 @@
       height: 100%;
       width: auto;
       overflow: visible;
+    }
+    /* 加载进度条:轨道高/色与主题切换按钮一致,填充与 thumb 同色——
+       走满后宽度收至 64px、填充收成圆,无缝变形为 ThemeToggle(main.js E 段) */
+    .preloader__progress {
+      width: clamp(150px, 34vw, 210px);
+      height: 32px;
+      border-radius: var(--radius-full);
+      background: var(--bg-2);
+      overflow: hidden;
+    }
+    .preloader__progress-fill {
+      width: 0;
+      height: 100%;
+      border-radius: var(--radius-full);
+      background: var(--accent);
+      transition: width 0.35s var(--ease);
+      /* 与描边动画同步起步先到 55%,之后由 main.js 关键点推进 */
+      animation: pl-progress-run 1.45s linear 0.15s both;
+    }
+    @keyframes pl-progress-run {
+      from { width: 0; }
+      to   { width: 55%; }
     }
     /* 描边 → 填实:同一实色,填完去掉描边 */
     .pl-char-path {
@@ -179,6 +203,10 @@
         fill-opacity: 1;
         stroke-width: 0;
       }
+      .preloader__progress-fill {
+        animation: none !important;
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -205,6 +233,9 @@
             <path class="pl-char-path" style="--i:8" pathLength="1" d="M4811 0L5043 320L5108 313Q5093 289 5077.5 271.5Q5062 254 5039.5 244Q5017 234 4979 234Q4912 234 4857.5 266Q4803 298 4770 351Q4737 404 4737 472Q4737 542 4772.5 598.5Q4808 655 4869 688Q4930 721 5006 721Q5083 721 5143.5 688Q5204 655 5239.5 599Q5275 543 5275 473Q5275 386 5215 297L5012 0ZM5006 366Q5034 366 5056.5 379Q5079 392 5091 415Q5103 438 5103 467Q5103 496 5091 519.5Q5079 543 5056.5 556Q5034 569 5006 569Q4978 569 4956 555.5Q4934 542 4921.5 519Q4909 496 4909 467Q4909 438 4921.5 415Q4934 392 4956 379Q4978 366 5006 366Z"/>
           </g>
         </svg>
+      </div>
+      <div class="preloader__progress" aria-hidden="true">
+        <div class="preloader__progress-fill"></div>
       </div>
   </div>
 
