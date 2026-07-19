@@ -50,7 +50,9 @@
           title="旧版站点"
           @click.prevent="onEnterLegacy"
         >
-          <Icon icon="lucide:rotate-ccw" width="20" height="20" />
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 3 L3 8 L8 8 M3 12 L6 6 L9 4 L12 3 L3 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
           <span>旧版</span>
         </a>
       </div>
