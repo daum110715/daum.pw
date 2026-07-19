@@ -5,7 +5,7 @@
       :class="`is-${phase}`"
       :aria-hidden="phase === 'idle' ? 'true' : undefined"
     >
-      <!-- 旧版 iframe:常驻预加载,过渡时与新版 main 景深交叉(无遮罩) -->
+      <!-- 旧版 iframe:常驻预加载,过渡时与新版 main opacity 交叉(无遮罩、无 scale 模糊) -->
       <iframe
         ref="iframeEl"
         class="legacy-iframe"
@@ -13,6 +13,26 @@
         title="daum.pw 旧版站点"
         @load="onIframeLoad"
       />
+
+      <!-- 品牌字 daum12569 SVG:描边填实(复刻开屏 pl-draw),过渡视觉锚点 -->
+      <svg
+        v-if="phase === 'enter' || phase === 'cover' || phase === 'reveal'"
+        class="legacy-brand"
+        :viewBox="BRAND_VIEWBOX"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <g :transform="BRAND_GROUP_TRANSFORM">
+          <path
+            v-for="(p, i) in BRAND_PATHS"
+            :key="i"
+            class="legacy-brand-path"
+            :d="p.d"
+            :style="{ '--i': i }"
+            pathLength="1"
+          />
+        </g>
+      </svg>
 
       <!-- 克隆自按钮的图标:旋转放大飞向屏幕中心,自身持续 spin -->
       <span
@@ -36,6 +56,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
+import { BRAND_PATHS, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM } from '@/data/brandGlyph'
 
 const emit = defineEmits(['fading'])
 
@@ -71,7 +92,7 @@ function nextFrame() {
   })
 }
 
-/** transitionend + setTimeout 双保险 */
+/** transitionend + setTimeout 双保险(同 main.js onTransformEnd) */
 function onTransitionEnd(el, prop, timeout) {
   return new Promise((resolve) => {
     if (!el) return resolve()
@@ -116,7 +137,6 @@ async function enter(rect) {
   if (phase.value !== 'idle') return
   savedOverflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
-  // iframe 未预加载则立即加载(预加载下此分支不触发)
   if (!iframeSrc.value) iframeSrc.value = './legacy/'
 
   if (reduced || document.hidden) {
@@ -137,16 +157,16 @@ async function enter(rect) {
     opacity: '1',
     transition: 'none',
   }
-  // 同步触发:新版 main 淡出+缩小 与 旧版 iframe 淡入+放大(景深交叉),无遮罩、无等待
+  // 同步触发:品牌字描边填实 + 图标旋转放大飞中间 + main/iframe opacity 交叉(无遮罩)
   phase.value = 'enter'
-  emit('fading', true)
+  emit('fading', true) // main 淡出
   await nextTick()
   await nextFrame()
 
-  // 图标旋转放大飞向屏幕中心(自身持续 spin)
+  // 图标旋转放大飞向屏幕中心(与品牌字叠加,自身持续 spin)
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const target = Math.min(vw, vh) * 0.2
+  const target = Math.min(vw, vh) * 0.12
   const tx = vw / 2 - target / 2 - rect.left
   const ty = vh / 2 - target / 2 - rect.top
   const scale = rect.width > 0 ? target / rect.width : 1
@@ -161,13 +181,14 @@ async function enter(rect) {
   }
   phase.value = 'cover'
 
-  // 图标飞到位 与 iframe 加载(预加载下即时) 并行
+  // 图标飞到位 与 iframe 加载(预加载下即时) 并行;品牌字描边填实同步进行
   await Promise.all([
     onTransitionEnd(flyIconEl.value, 'transform', 600),
     waitForLoad(),
   ])
 
-  // 图标淡出(旧版已显现),等 iframe 淡入完
+  // reveal:品牌字 + 图标淡出,等 iframe 淡入完
+  phase.value = 'reveal'
   iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.4s var(--ease)' }
   await Promise.all([
     onTransitionEnd(flyIconEl.value, 'opacity', 500),
@@ -180,7 +201,7 @@ async function enter(rect) {
 function exit() {
   if (phase.value === 'idle' || phase.value === 'closing') return
   phase.value = 'closing'
-  emit('fading', false) // 新版 main 淡入恢复
+  emit('fading', false) // main 淡入恢复
   window.setTimeout(() => {
     reset()
   }, 420)
@@ -199,7 +220,7 @@ function onKey(e) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  // 开屏结束后预加载旧版(避免与 preloader 抢带宽);idle 时隐藏不挡新版
+  // 开屏结束后预加载旧版(避免与 preloader 抢带宽);idle 隐藏不挡新版
   window.setTimeout(() => {
     if (phase.value === 'idle' && !iframeSrc.value) iframeSrc.value = './legacy/'
   }, 3000)
@@ -227,21 +248,62 @@ defineExpose({ enter })
   border: 0;
   background: var(--bg);
   opacity: 0;
-  transform: scale(0.94);
-  transform-origin: center;
-  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  transition: opacity 0.6s var(--ease); /* 纯 opacity 交叉,无 scale(避免 iframe 位图缩放模糊) */
 }
-/* enter/cover/reveal/done:旧版平滑淡入+放大到位(与新版 main 淡出+缩小景深交叉) */
 .legacy-stage.is-enter .legacy-iframe,
 .legacy-stage.is-cover .legacy-iframe,
 .legacy-stage.is-reveal .legacy-iframe,
 .legacy-stage.is-done .legacy-iframe {
   opacity: 1;
-  transform: scale(1);
+}
+/* 品牌字 SVG:屏幕中心,描边填实(复刻 index.html pl-draw),reveal 时淡出 */
+.legacy-brand {
+  position: fixed;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  height: clamp(2rem, 8vw, 4rem);
+  width: auto;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+  pointer-events: none;
+  transition: opacity 0.4s var(--ease);
+}
+.legacy-stage.is-reveal .legacy-brand {
+  opacity: 0;
+}
+.legacy-brand-path {
+  fill: var(--brand-ink);
+  fill-opacity: 0;
+  stroke: color-mix(in srgb, var(--accent) 55%, white);
+  stroke-width: 40;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: legacy-brand-draw 0.5s var(--ease) forwards;
+  animation-delay: calc(var(--i) * 0.05s);
+}
+@keyframes legacy-brand-draw {
+  0% {
+    stroke-dashoffset: 1;
+    fill-opacity: 0;
+    stroke-width: 40;
+  }
+  72% {
+    stroke-dashoffset: 0;
+    fill-opacity: 0;
+    stroke-width: 40;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    fill-opacity: 1;
+    stroke-width: 0;
+  }
 }
 .legacy-fly-icon {
   position: fixed;
-  z-index: 3;
+  z-index: 4; /* 图标在品牌字之上,叠加旋转 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -267,7 +329,7 @@ defineExpose({ enter })
   position: fixed;
   top: 18px;
   left: 18px;
-  z-index: 4;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -296,9 +358,11 @@ defineExpose({ enter })
   .legacy-stage.is-closing {
     transition: none;
   }
-  .legacy-iframe {
-    transform: none !important;
-    transition: opacity 0.6s var(--ease);
+  .legacy-brand-path {
+    animation: none;
+    stroke-dashoffset: 0;
+    fill-opacity: 1;
+    stroke-width: 0;
   }
   .legacy-fly-icon :deep(.legacy-spin) {
     animation: none;

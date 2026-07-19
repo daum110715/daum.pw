@@ -28,12 +28,10 @@ function onLegacyFading(v) {
 
 <style scoped>
 main {
-  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
-  transform-origin: center;
+  transition: opacity 0.6s var(--ease); /* 纯 opacity 淡出,与 iframe 交叉(无遮罩) */
 }
 main.is-legacy-fading {
   opacity: 0;
-  transform: scale(0.94);
 }
 .theme-floating {
   position: fixed;
