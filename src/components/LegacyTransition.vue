@@ -22,6 +22,12 @@
         aria-hidden="true"
         xmlns="http://www.w3.org/2000/svg"
       >
+        <defs>
+          <linearGradient id="legacyBrandGrad" x1="0" y1="0" x2="5295.5" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0" class="g-stop-1" />
+            <stop offset="1" class="g-stop-2" />
+          </linearGradient>
+        </defs>
         <g :transform="BRAND_GROUP_TRANSFORM">
           <path
             v-for="(p, i) in BRAND_PATHS"
@@ -333,7 +339,7 @@ defineExpose({ enter })
   opacity: 0;
 }
 .legacy-brand-path {
-  fill: var(--brand-ink);
+  fill: url(#legacyBrandGrad);
   fill-opacity: 0;
   stroke: color-mix(in srgb, var(--accent) 55%, white);
   stroke-width: 40;
