@@ -250,6 +250,20 @@ async function handoff() {
   clone.style.pointerEvents = 'none'
   document.body.appendChild(clone)
 
+  // 进度条提前提升到 body 并锁定位置:不随 preloader 隐藏,飞行期间持续推进
+  const prog = el.querySelector('.preloader__progress')
+  if (prog) {
+    const pr = prog.getBoundingClientRect()
+    document.body.appendChild(prog)
+    prog.style.position = 'fixed'
+    prog.style.left = pr.left + 'px'
+    prog.style.top = pr.top + 'px'
+    prog.style.width = pr.width + 'px'
+    prog.style.height = pr.height + 'px'
+    prog.style.margin = '0'
+    prog.style.zIndex = '10002'
+  }
+
   // 幕布硬切隐藏(无淡化)
   brand.style.visibility = 'hidden'
   el.style.visibility = 'hidden'
@@ -280,29 +294,19 @@ async function handoff() {
   clone.remove()
 
   // ---- E. 进度条走满 → 变形为主题切换按钮(轨道同高同色、填充同色) ----
-  const prog = el.querySelector('.preloader__progress')
+  // prog 已在 B 段提升到 body(不随 preloader 隐藏,全程可见)
   const fill = prog && prog.querySelector('.preloader__progress-fill')
   const toggleEl = document.querySelector('.theme-floating')
   const track = toggleEl && toggleEl.querySelector('.track')
   const thumb = toggleEl && toggleEl.querySelector('.thumb')
 
   if (!(prog && fill && track && thumb)) {
+    if (prog) prog.remove()
     killPreloader(el)
     finishBoot(heroTitle)
     revealToggle()
     return
   }
-
-  // 提升到 body 并锁定当前视觉位置(preloader 随即移除,进度条不受影响)
-  const pRect = prog.getBoundingClientRect()
-  document.body.appendChild(prog)
-  prog.style.position = 'fixed'
-  prog.style.left = pRect.left + 'px'
-  prog.style.top = pRect.top + 'px'
-  prog.style.width = pRect.width + 'px'
-  prog.style.height = pRect.height + 'px'
-  prog.style.margin = '0'
-  prog.style.zIndex = '10003'
 
   setProgress(fill, 1)
   killPreloader(el)
@@ -311,9 +315,17 @@ async function handoff() {
   await wait(400) // 等填充走满(0.35s transition)
 
   // 变形:长条 → 64px 轨道,填充 → thumb 圆,同时平移到按钮位。
-  // 目标形态直接量真按钮(rect 不受 opacity 影响),亮/暗拇指位自动一致。
+  // 目标形态直接量真按钮 rect,亮/暗拇指位自动一致。
+  // 注意:真按钮未点亮时带 reveal 的 translateY(22px) 位移,且 .reveal 有
+  // 0.6s 过渡——须先禁过渡再清 transform,才能量到最终静止位,
+  // 否则变形终点偏下 22px、接管瞬间跳变。
+  toggleEl.style.transition = 'none'
+  toggleEl.style.transform = 'none'
   const trackRect = track.getBoundingClientRect()
   const thumbRect = thumb.getBoundingClientRect()
+  toggleEl.style.transform = ''
+  toggleEl.style.transition = ''
+
   const fillRect = fill.getBoundingClientRect()
   fill.style.width = fillRect.width + 'px'
   fill.style.height = fillRect.height + 'px'
