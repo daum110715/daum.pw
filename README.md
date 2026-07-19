@@ -7,7 +7,7 @@
 
 ## 特性
 
-- **新拟态设计系统** -- 纯 CSS 设计令牌 + 工具类（`src/styles/neu.css`），统一卡片 / 按钮 / 标签质感。当前阶段为扁平表面 + 柔和的多层径向渐变背景，新拟态阴影令牌（`--shadow-light` / `--shadow-dark`）已定义、待重新启用（见 [DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)）。
+- **新拟态设计系统** -- 纯 CSS 设计令牌 + 工具类（`src/styles/neu.css`），统一卡片 / 按钮 / 标签质感。当前阶段为扁平表面 + 柔和的多层径向渐变背景，新拟态阴影令牌（`--shadow-light` / `--shadow-dark`）已定义、待重新启用。
 - **亮 / 暗双主题** -- `index.html` 首帧前内联脚本按 `localStorage` / 系统偏好设定 `data-theme`，**防主题闪烁**；切换时一道斜向光带扫过页面、颜色平滑过渡，并尊重 `prefers-reduced-motion`。
 - **滚动入场动画** -- `useReveal` 基于 `IntersectionObserver`，元素进入视口时淡入上浮，不支持时降级为直接显示。
 - **签名轮播** -- Hero 区每 7 秒切换一条程序员段子，hover / focus 暂停，`prefers-reduced-motion` 下不自动播放。
@@ -55,19 +55,8 @@ daum.pw/
 │  ├─ composables/         # useTheme / useReveal
 │  ├─ assets/              # 静态资源（clawd.webm）
 │  └─ data/                # 内容数据（项目/签名/技能/统计/历程/感谢/Now/友邻/社交）
-├─ legacy/                 # 旧版本归档（Node 服务版 + 小游戏合集）
-└─ docs/                   # 项目文档
+└─ legacy/                 # 旧版本归档（Node 服务版 + 小游戏合集）
 ```
-
-## 文档
-
-更深入的说明见 [`docs/`](./docs)：
-
-| 文档 | 内容 |
-|------|------|
-| [PROJECT_GUIDE.md](./docs/PROJECT_GUIDE.md) | 项目导航：目录详解、核心机制、组件速查表、修改影响速查、陷阱 |
-| [DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md) | 设计系统：设计令牌、工具类、主题切换、动画 |
-| [DEVELOPMENT.md](./docs/DEVELOPMENT.md) | 开发指南：环境、脚本、扩展数据、新增 Section、CI/CD 部署 |
 
 ## 部署
 
