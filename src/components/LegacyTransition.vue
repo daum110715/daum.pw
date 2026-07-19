@@ -21,7 +21,7 @@
         class="legacy-fly-icon"
         :style="iconStyle"
       >
-        <Icon icon="lucide:history" class="legacy-spin" width="100%" height="100%" />
+        <Icon icon="lucide:rotate-ccw" class="legacy-spin" width="100%" height="100%" />
       </span>
 
       <!-- 返回新版 -->

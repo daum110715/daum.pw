@@ -50,7 +50,7 @@
           title="旧版站点"
           @click.prevent="onEnterLegacy"
         >
-          <Icon icon="lucide:history" width="20" height="20" />
+          <Icon icon="lucide:rotate-ccw" width="20" height="20" />
           <span>旧版</span>
         </a>
       </div>
