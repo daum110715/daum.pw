@@ -46,7 +46,7 @@
 
       <!-- 返回新版 -->
       <button v-if="phase === 'done'" class="legacy-back" type="button" @click="exit($event)">
-        <Icon icon="lucide:arrow-left" width="18" height="18" />
+        <Icon icon="lucide:arrow-left" width="20" height="20" />
         <span>返回新版</span>
       </button>
     </div>
@@ -385,6 +385,7 @@ defineExpose({ enter })
     transform: rotate(360deg);
   }
 }
+/* 返回新版:与 HeroSection「旧版」入口(.legacy-link)同款风格,两个按钮对偶 */
 .legacy-back {
   position: fixed;
   top: 18px;
@@ -393,21 +394,21 @@ defineExpose({ enter })
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 16px;
+  height: 48px;
+  padding: 0 18px;
   border-radius: var(--radius);
   background: var(--bg-2);
-  color: var(--accent-text);
+  color: var(--text);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  font-size: 15px;
+  white-space: nowrap;
   transition:
-    transform var(--dur) var(--ease),
+    color var(--dur) var(--ease),
     background var(--dur) var(--ease);
 }
 .legacy-back:hover {
-  transform: translateY(-2px);
+  color: var(--accent);
   background: var(--accent-soft);
 }
 @media (prefers-reduced-motion: reduce) {
