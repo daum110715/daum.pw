@@ -5,6 +5,7 @@
       :class="`is-${phase}`"
       :aria-hidden="phase === 'idle' ? 'true' : undefined"
     >
+      <!-- 旧版 iframe:常驻预加载,过渡时与新版 main opacity 交叉(无遮罩、无 scale 模糊) -->
       <iframe
         ref="iframeEl"
         class="legacy-iframe"
@@ -13,17 +14,17 @@
         @load="onIframeLoad"
       />
 
-      <!-- morphing path:箭头(rotate-ccw) <-> 尾线 <-> 箭头,flubber 自动插值 -->
-      <svg
+      <!-- 转圈图标:在「旧版」按钮与「返回新版」按钮两地之间平滑移动,done 时停在返回按钮图标位 -->
+      <span
         v-if="phase !== 'idle'"
+        ref="flyIconEl"
         class="legacy-fly-icon"
         :style="iconStyle"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
       >
-        <path :d="morphD" class="legacy-fly-path" />
-      </svg>
+        <Icon icon="lucide:rotate-ccw" class="legacy-spin" width="100%" height="100%" />
+      </span>
 
+      <!-- 返回新版 -->
       <button v-if="phase === 'done'" class="legacy-back" type="button" @click="exit($event)">
         <span>返回新版</span>
       </button>
@@ -33,39 +34,33 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { interpolate } from 'flubber'
+import { Icon } from '@iconify/vue'
 
 const emit = defineEmits(['fading'])
 
+// 与 main.js 开屏动画同源回弹缓动
+const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const reduced =
   typeof window !== 'undefined' &&
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// 返回按钮图标位中心(fly-icon width 40 -> 左上偏 20)
+// 「返回新版」按钮图标位中心(.legacy-back top18 left18,去 arrow-left 后图标 left36 top32 -> 中心 46,42)
+// enter 时该按钮尚未显示,用预设;exit 时按钮已显示,用实际 rect
 const RETURN_CENTER = { x: 46, y: 42 }
-const FLY_SIZE = 40
 
-// 箭头 path:rotate-ccw 精确(含 A 命令弧),绝对坐标,合并单 path
-const ARROW = 'M3 12 A9 9 0 1 0 12 3 A9.75 9.75 0 0 0 5.26 5.74 L3 8 M3 3 L3 8 L8 8'
-// 尾线 path:24x24 内弧线(代表拖尾线条形态),flubber 自动与 ARROW 插值
-const TRAIL = 'M3 12 Q12 0 21 12'
-
-// flubber 预建插值器(自动采样 A 命令,不同节点可插值)
-const toTrail = interpolate(ARROW, TRAIL)
-const toArrow = interpolate(TRAIL, ARROW)
-
+// idle -> enter -> cover -> reveal -> done -> returning -> returning-out -> idle
 const phase = ref('idle')
 const iframeSrc = ref('')
 const iconStyle = ref({})
-const morphD = ref(ARROW)
 const iframeEl = ref(null)
+const flyIconEl = ref(null)
 
 let savedOverflow = ''
 let loadResolver = null
 let loadDone = false
-let rafId = 0
 
+/** 下一帧:rAF 为主,setTimeout 兜底 */
 function nextFrame() {
   return new Promise((r) => {
     let done = false
@@ -79,6 +74,7 @@ function nextFrame() {
   })
 }
 
+/** transitionend + setTimeout 双保险(同 main.js onTransformEnd) */
 function onTransitionEnd(el, prop, timeout) {
   return new Promise((resolve) => {
     if (!el) return resolve()
@@ -119,37 +115,20 @@ function waitForLoad(timeout = 8000) {
   })
 }
 
-function lerp(a, b, t) {
-  return a + (b - a) * t
+/** 图标从 originRect 中心飞到 (targetX, targetY),尺寸不变(只平移+旋转) */
+function flyTo(originRect, targetX, targetY) {
+  const dx = targetX - (originRect.left + originRect.width / 2)
+  const dy = targetY - (originRect.top + originRect.height / 2)
+  return { dx, dy }
 }
 
-function easeOut(t) {
-  return 1 - Math.pow(1 - t, 3)
-}
-
-/** morphing + 位移:rAF 驱动,箭头(起点) -> 尾线 -> 箭头(终点) */
-function runMorph(sx, sy, ex, ey, duration) {
-  return new Promise((resolve) => {
-    if (rafId) cancelAnimationFrame(rafId)
-    const start = performance.now()
-    function frame(now) {
-      const p = Math.min(1, (now - start) / duration)
-      const t = easeOut(p)
-      const d = p < 0.5 ? toTrail(p * 2) : toArrow((p - 0.5) * 2)
-      morphD.value = d
-      const x = lerp(sx, ex, t) - FLY_SIZE / 2
-      const y = lerp(sy, ey, t) - FLY_SIZE / 2
-      iconStyle.value = { transform: `translate(${x}px, ${y}px)`, opacity: '1' }
-      if (p < 1) {
-        rafId = requestAnimationFrame(frame)
-      } else {
-        morphD.value = ARROW
-        rafId = 0
-        resolve()
-      }
-    }
-    rafId = requestAnimationFrame(frame)
-  })
+/** 取「旧版」按钮内图标 svg 的 rect(exit 时新版 main 已淡入,元素在 DOM) */
+function getLegacyIconRect() {
+  const link = document.querySelector('.legacy-link')
+  const svg = link && link.querySelector('svg')
+  return (svg || link || {}).getBoundingClientRect
+    ? (svg || link).getBoundingClientRect()
+    : null
 }
 
 async function enter(rect) {
@@ -158,54 +137,104 @@ async function enter(rect) {
   document.body.style.overflow = 'hidden'
   if (!iframeSrc.value) iframeSrc.value = './legacy/'
 
-  const sx = rect.left + rect.width / 2
-  const sy = rect.top + rect.height / 2
-  const ex = RETURN_CENTER.x
-  const ey = RETURN_CENTER.y
-
   if (reduced || document.hidden) {
     phase.value = 'loading'
     emit('fading', true)
     await waitForLoad()
-    morphD.value = ARROW
-    iconStyle.value = { transform: `translate(${ex - FLY_SIZE / 2}px, ${ey - FLY_SIZE / 2}px)` }
     phase.value = 'done'
     return
   }
 
+  // 图标克隆到「旧版」按钮位
+  iconStyle.value = {
+    left: rect.left + 'px',
+    top: rect.top + 'px',
+    width: rect.width + 'px',
+    height: rect.height + 'px',
+    transform: 'translate(0px, 0px)',
+    opacity: '1',
+    transition: 'none',
+  }
+  // 同步触发:图标从旧版按钮位飞向返回按钮位 + main/iframe opacity 交叉(无遮罩)
   phase.value = 'enter'
-  emit('fading', true)
+  emit('fading', true) // main 淡出
   await nextTick()
   await nextFrame()
 
+  const { dx, dy } = flyTo(rect, RETURN_CENTER.x, RETURN_CENTER.y)
+  iconStyle.value = {
+    left: rect.left + 'px',
+    top: rect.top + 'px',
+    width: rect.width + 'px',
+    height: rect.height + 'px',
+    transform: `translate(${dx}px, ${dy}px)`,
+    opacity: '1',
+    transition: `transform 0.5s ${EASE}`,
+  }
   phase.value = 'cover'
-  await Promise.all([runMorph(sx, sy, ex, ey, 800), waitForLoad()])
+
+  // 图标飞到位 与 iframe 加载(预加载下即时) 并行;品牌字描边填实同步进行
+  await Promise.all([
+    onTransitionEnd(flyIconEl.value, 'transform', 600),
+    waitForLoad(),
+  ])
+
+  // reveal:等 iframe 淡入完(图标保持显示,停留返回按钮图标位)
+  phase.value = 'reveal'
+  await onTransitionEnd(iframeEl.value, 'opacity', 700)
 
   phase.value = 'done'
 }
 
+/** 返回新版:图标从「返回新版」按钮位飞回「旧版」按钮位(反向) */
 async function exit(event) {
   if (phase.value !== 'done') return
-  const btn = event && event.currentTarget
-  const btnRect = btn && btn.getBoundingClientRect()
-  const sx = btnRect ? btnRect.left + btnRect.width / 2 : RETURN_CENTER.x
-  const sy = btnRect ? btnRect.top + btnRect.height / 2 : RETURN_CENTER.y
-  const link = document.querySelector('.legacy-link')
-  const linkSvg = link && link.querySelector('svg')
-  const linkRect = linkSvg
-    ? linkSvg.getBoundingClientRect()
-    : link
-      ? link.getBoundingClientRect()
-      : null
-  const ex = linkRect ? linkRect.left + linkRect.width / 2 : window.innerWidth / 2
-  const ey = linkRect ? linkRect.top + linkRect.height / 2 : window.innerHeight / 2
+  // origin:返回按钮内图标位(Esc 无 event,用预设返回按钮图标位)
+  const backBtn = event && event.currentTarget
+  const backSvg = backBtn && backBtn.querySelector('svg')
+  const originRect =
+    (backSvg && backSvg.getBoundingClientRect()) ||
+    { left: RETURN_CENTER.x - 10, top: RETURN_CENTER.y - 10, width: 20, height: 20 }
 
+  iconStyle.value = {
+    left: originRect.left + 'px',
+    top: originRect.top + 'px',
+    width: originRect.width + 'px',
+    height: originRect.height + 'px',
+    transform: 'translate(0px, 0px)',
+    opacity: '1',
+    transition: 'none',
+  }
+  // 同步触发:图标从返回按钮位飞回旧版按钮位 + iframe 淡出/main 淡入
   phase.value = 'returning'
-  emit('fading', false)
+  emit('fading', false) // main 淡入
   await nextTick()
   await nextFrame()
 
-  await runMorph(sx, sy, ex, ey, 800)
+  const legacyRect = getLegacyIconRect()
+  const targetX = legacyRect ? legacyRect.left + legacyRect.width / 2 : window.innerWidth / 2
+  const targetY = legacyRect ? legacyRect.top + legacyRect.height / 2 : window.innerHeight / 2
+  const { dx, dy } = flyTo(originRect, targetX, targetY)
+  iconStyle.value = {
+    left: originRect.left + 'px',
+    top: originRect.top + 'px',
+    width: originRect.width + 'px',
+    height: originRect.height + 'px',
+    transform: `translate(${dx}px, ${dy}px)`,
+    opacity: '1',
+    transition: `transform 0.5s ${EASE}`,
+  }
+
+  // 图标飞到位 与 iframe 淡出 并行;品牌字描边填实同步
+  await Promise.all([
+    onTransitionEnd(flyIconEl.value, 'transform', 600),
+    onTransitionEnd(iframeEl.value, 'opacity', 700),
+  ])
+
+  // returning-out:品牌字 + 图标淡出
+  phase.value = 'returning-out'
+  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.4s var(--ease)' }
+  await onTransitionEnd(flyIconEl.value, 'opacity', 500)
 
   reset()
 }
@@ -213,8 +242,8 @@ async function exit(event) {
 function reset() {
   phase.value = 'idle'
   iconStyle.value = {}
-  morphD.value = ARROW
   document.body.style.overflow = savedOverflow
+  // iframe src 与 loadDone 保留:下次 enter 即时(已预加载)
 }
 
 function onKey(e) {
@@ -223,14 +252,12 @@ function onKey(e) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKey)
+  // 开屏结束后预加载旧版(避免与 preloader 抢带宽);idle 隐藏不挡新版
   window.setTimeout(() => {
     if (phase.value === 'idle' && !iframeSrc.value) iframeSrc.value = './legacy/'
   }, 3000)
 })
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKey)
-  if (rafId) cancelAnimationFrame(rafId)
-})
+onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 defineExpose({ enter })
 </script>
@@ -240,7 +267,7 @@ defineExpose({ enter })
   position: fixed;
   inset: 0;
   z-index: 10000;
-  pointer-events: none;
+  pointer-events: none; /* idle 不挡新版交互 */
 }
 .legacy-stage:not(.is-idle) {
   pointer-events: auto;
@@ -253,8 +280,9 @@ defineExpose({ enter })
   border: 0;
   background: var(--bg);
   opacity: 0;
-  transition: opacity 0.6s var(--ease);
+  transition: opacity 0.6s var(--ease); /* 纯 opacity 交叉,无 scale(避免 iframe 位图缩放模糊) */
 }
+/* 进过渡:iframe 淡入;done 全显;返回过渡(returning/returning-out):iframe 淡出(默认 opacity 0) */
 .legacy-stage.is-enter .legacy-iframe,
 .legacy-stage.is-cover .legacy-iframe,
 .legacy-stage.is-reveal .legacy-iframe,
@@ -264,28 +292,28 @@ defineExpose({ enter })
 .legacy-fly-icon {
   position: fixed;
   z-index: 6;
-  width: 40px;
-  height: 40px;
-  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
   pointer-events: none;
-  will-change: transform;
+  will-change: transform, opacity;
 }
-.legacy-fly-path {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transform-origin: 50% 50%;
+.legacy-fly-icon :deep(svg) {
+  width: 100%;
+  height: 100%;
 }
-.legacy-stage.is-done .legacy-fly-path {
+/* 外层 fly-icon 管 translate(两地移动),内层 svg 管 spin,两层 transform 互不干扰 */
+.legacy-fly-icon :deep(.legacy-spin) {
   animation: legacy-spin 1.1s linear infinite;
+  transform-origin: 50% 50%;
 }
 @keyframes legacy-spin {
   to {
     transform: rotate(-360deg);
   }
 }
+/* 返回新版:与 HeroSection「旧版」入口(.legacy-link)同款风格,两个按钮对偶 */
 .legacy-back {
   position: fixed;
   top: 18px;
@@ -295,7 +323,7 @@ defineExpose({ enter })
   align-items: center;
   gap: 8px;
   height: 48px;
-  padding: 0 18px 0 46px;
+  padding: 0 18px 0 46px; /* 左 46 留 fly-icon 图标位(替代 arrow-left) */
   border-radius: var(--radius);
   background: var(--bg-2);
   color: var(--text);
@@ -312,7 +340,7 @@ defineExpose({ enter })
   background: var(--accent-soft);
 }
 @media (prefers-reduced-motion: reduce) {
-  .legacy-stage.is-done .legacy-fly-path {
+  .legacy-fly-icon :deep(.legacy-spin) {
     animation: none;
   }
 }

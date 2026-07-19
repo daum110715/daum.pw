@@ -14,7 +14,6 @@
     "@iconify-json/ph": "^1.2.2",
     "@iconify-json/simple-icons": "^1.2.90",
     "@iconify/vue": "^5.0.1",
-    "flubber": "^0.4.2",
     "vue": "^3.4.21"
   },
   "devDependencies": {
