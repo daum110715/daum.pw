@@ -14,7 +14,7 @@
         @load="onIframeLoad"
       />
 
-      <!-- 品牌字 daum12569 SVG:描边填实(复刻开屏 pl-draw),进/出过渡视觉锚点 -->
+      <!-- 品牌字 daum12569 SVG:描边填实(复刻开屏 pl-draw),过渡视觉锚点 -->
       <svg
         v-if="phase !== 'idle' && phase !== 'done'"
         class="legacy-brand"
@@ -34,7 +34,7 @@
         </g>
       </svg>
 
-      <!-- 克隆自按钮的图标:旋转放大飞向屏幕中心,自身持续 spin -->
+      <!-- 转圈图标:在「旧版」按钮与「返回新版」按钮两地之间平滑移动,自身持续 spin -->
       <span
         v-if="phase !== 'idle' && phase !== 'done'"
         ref="flyIconEl"
@@ -66,6 +66,10 @@ const reduced =
   typeof window !== 'undefined' &&
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// 「返回新版」按钮中心预设(.legacy-back: top18 left18,约 w114 h44 -> 中心 75,40)
+// enter 时该按钮尚未显示,用预设;exit 时按钮已显示,用实际 rect
+const RETURN_CENTER = { x: 75, y: 40 }
 
 // idle -> enter -> cover -> reveal -> done -> returning -> returning-out -> idle
 const phase = ref('idle')
@@ -133,15 +137,20 @@ function waitForLoad(timeout = 8000) {
   })
 }
 
-/** 计算图标从 origin rect 飞向屏幕中心的终态 transform */
-function flyToCenter(originLeft, originTop, originW, originH) {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const target = Math.min(vw, vh) * 0.12
-  const tx = vw / 2 - target / 2 - originLeft
-  const ty = vh / 2 - target / 2 - originTop
-  const scale = originW > 0 ? target / originW : 1
-  return { target, tx, ty, scale }
+/** 图标从 originRect 中心飞到 (targetX, targetY),尺寸不变(只平移+旋转) */
+function flyTo(originRect, targetX, targetY) {
+  const dx = targetX - (originRect.left + originRect.width / 2)
+  const dy = targetY - (originRect.top + originRect.height / 2)
+  return { dx, dy }
+}
+
+/** 取「旧版」按钮内图标 svg 的 rect(exit 时新版 main 已淡入,元素在 DOM) */
+function getLegacyIconRect() {
+  const link = document.querySelector('.legacy-link')
+  const svg = link && link.querySelector('svg')
+  return (svg || link || {}).getBoundingClientRect
+    ? (svg || link).getBoundingClientRect()
+    : null
 }
 
 async function enter(rect) {
@@ -158,29 +167,29 @@ async function enter(rect) {
     return
   }
 
-  // 图标克隆到按钮位(旧版按钮)
+  // 图标克隆到「旧版」按钮位
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
     width: rect.width + 'px',
     height: rect.height + 'px',
-    transform: 'translate(0px, 0px) scale(1)',
+    transform: 'translate(0px, 0px)',
     opacity: '1',
     transition: 'none',
   }
-  // 同步触发:品牌字描边填实 + 图标旋转放大飞中间 + main/iframe opacity 交叉(无遮罩)
+  // 同步触发:品牌字描边填实 + 图标从旧版按钮位飞向返回按钮位 + main/iframe opacity 交叉
   phase.value = 'enter'
   emit('fading', true) // main 淡出
   await nextTick()
   await nextFrame()
 
-  const { tx, ty, scale } = flyToCenter(rect.left, rect.top, rect.width, rect.height)
+  const { dx, dy } = flyTo(rect, RETURN_CENTER.x, RETURN_CENTER.y)
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
     width: rect.width + 'px',
     height: rect.height + 'px',
-    transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+    transform: `translate(${dx}px, ${dy}px)`,
     opacity: '1',
     transition: `transform 0.5s ${EASE}`,
   }
@@ -203,41 +212,41 @@ async function enter(rect) {
   phase.value = 'done'
 }
 
-/** 返回新版:enter 的反向(品牌字描边 + 图标从返回按钮飞中心 + iframe 淡出/main 淡入交叉) */
+/** 返回新版:图标从「返回新版」按钮位飞回「旧版」按钮位(反向) */
 async function exit(event) {
   if (phase.value !== 'done') return
-  // 图标从"返回新版"按钮位飞中心(Esc 无 event,从屏幕中心起)
-  const rect = event?.currentTarget?.getBoundingClientRect?.()
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const target = Math.min(vw, vh) * 0.12
-  const originLeft = rect ? rect.left : vw / 2 - target / 2
-  const originTop = rect ? rect.top : vh / 2 - target / 2
-  const originW = rect ? rect.width : target
-  const originH = rect ? rect.height : target
+  // origin:返回按钮内图标 svg 位(Esc 无 event,用预设返回按钮中心)
+  const backBtn = event && event.currentTarget
+  const backSvg = backBtn && backBtn.querySelector('svg')
+  const originRect =
+    (backSvg && backSvg.getBoundingClientRect()) ||
+    { left: RETURN_CENTER.x - 9, top: RETURN_CENTER.y - 9, width: 18, height: 18 }
 
   iconStyle.value = {
-    left: originLeft + 'px',
-    top: originTop + 'px',
-    width: originW + 'px',
-    height: originH + 'px',
-    transform: 'translate(0px, 0px) scale(1)',
+    left: originRect.left + 'px',
+    top: originRect.top + 'px',
+    width: originRect.width + 'px',
+    height: originRect.height + 'px',
+    transform: 'translate(0px, 0px)',
     opacity: '1',
     transition: 'none',
   }
-  // 同步触发:品牌字描边填实 + 图标飞中心 + iframe 淡出 + main 淡入(反向交叉)
+  // 同步触发:品牌字描边填实 + 图标从返回按钮位飞回旧版按钮位 + iframe 淡出/main 淡入
   phase.value = 'returning'
   emit('fading', false) // main 淡入
   await nextTick()
   await nextFrame()
 
-  const { tx, ty, scale } = flyToCenter(originLeft, originTop, originW, originH)
+  const legacyRect = getLegacyIconRect()
+  const targetX = legacyRect ? legacyRect.left + legacyRect.width / 2 : window.innerWidth / 2
+  const targetY = legacyRect ? legacyRect.top + legacyRect.height / 2 : window.innerHeight / 2
+  const { dx, dy } = flyTo(originRect, targetX, targetY)
   iconStyle.value = {
-    left: originLeft + 'px',
-    top: originTop + 'px',
-    width: originW + 'px',
-    height: originH + 'px',
-    transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+    left: originRect.left + 'px',
+    top: originRect.top + 'px',
+    width: originRect.width + 'px',
+    height: originRect.height + 'px',
+    transform: `translate(${dx}px, ${dy}px)`,
     opacity: '1',
     transition: `transform 0.5s ${EASE}`,
   }
@@ -354,7 +363,7 @@ defineExpose({ enter })
 }
 .legacy-fly-icon {
   position: fixed;
-  z-index: 4; /* 图标在品牌字之上,叠加旋转 */
+  z-index: 4; /* 图标在品牌字之上 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -366,7 +375,7 @@ defineExpose({ enter })
   width: 100%;
   height: 100%;
 }
-/* 外层 fly-icon 管 translate+scale,内层 svg 管 spin,两层 transform 互不干扰 */
+/* 外层 fly-icon 管 translate(两地移动),内层 svg 管 spin,两层 transform 互不干扰 */
 .legacy-fly-icon :deep(.legacy-spin) {
   animation: legacy-spin 1.1s linear infinite;
   transform-origin: 50% 50%;
