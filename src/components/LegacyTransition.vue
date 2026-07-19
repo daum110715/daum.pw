@@ -6,7 +6,7 @@
       :class="`is-${phase}`"
       :aria-hidden="phase === 'idle' ? 'true' : undefined"
     >
-      <!-- 旧版 iframe(下层,翻转后露出) -->
+      <!-- 旧版 iframe(下层,幕布淡出后露出) -->
       <iframe
         ref="iframeEl"
         class="legacy-iframe"
@@ -15,18 +15,18 @@
         @load="onIframeLoad"
       />
 
-      <!-- 幕布层(clip-path 扩散铺满 + 3D 翻转揭示) -->
+      <!-- 幕布层:clip-path 扩散铺满,reveal 时整体淡出 -->
       <div ref="curtainEl" class="legacy-curtain" :style="curtainStyle">
         <div ref="faceEl" class="legacy-curtain-face" :style="faceStyle" />
       </div>
 
-      <!-- 克隆自按钮的图标:旋转放大飞向屏幕中心 -->
+      <!-- 克隆自按钮的图标:放大飞向屏幕中心,自身持续 spin -->
       <span
         v-if="phase === 'enter' || phase === 'cover' || phase === 'reveal'"
         class="legacy-fly-icon"
         :style="iconStyle"
       >
-        <Icon icon="lucide:history" width="100%" height="100%" />
+        <Icon icon="lucide:history" class="legacy-spin" width="100%" height="100%" />
       </span>
 
       <!-- 返回新版 -->
@@ -143,13 +143,13 @@ async function enter(rect) {
 
   // 初始态:幕布缩为图标位置的圆点,图标克隆至按钮图标位
   curtainStyle.value = { clipPath: `circle(0px at ${cx}px ${cy}px)`, transition: 'none' }
-  faceStyle.value = { transform: 'rotateY(0deg)', transition: 'none' }
+  faceStyle.value = { opacity: '1', transition: 'none' }
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
     width: rect.width + 'px',
     height: rect.height + 'px',
-    transform: 'rotate(0deg) scale(1)',
+    transform: 'translate(0px, 0px) scale(1)',
     opacity: '1',
     transition: 'none',
   }
@@ -157,7 +157,7 @@ async function enter(rect) {
   await nextTick()
   await nextFrame()
 
-  // cover:幕布圆形扩散铺满 + 图标旋转 720° 放大飞向屏幕中心
+  // cover:幕布圆形扩散铺满 + 图标放大飞向屏幕中心(图标自身持续 spin)
   const vw = window.innerWidth
   const vh = window.innerHeight
   const target = Math.min(vw, vh) * 0.2
@@ -175,22 +175,21 @@ async function enter(rect) {
     top: rect.top + 'px',
     width: rect.width + 'px',
     height: rect.height + 'px',
-    transform: `translate(${tx}px, ${ty}px) rotate(720deg) scale(${scale})`,
+    transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
     opacity: '1',
     transition: `transform 0.5s ${EASE}`,
   }
   phase.value = 'cover'
 
-  // 幕布铺满 与 iframe 加载 并行,都完成才揭示
+  // 幕布铺满 与 iframe 加载 并行,都完成才过渡
   await Promise.all([onTransitionEnd(curtainEl.value, 'clip-path', 700), waitForLoad()])
 
-  // reveal:先卸 clip-path(避免裁剪 3D),图标淡出 + 幕布 3D 翻转露出 iframe
+  // reveal:图标持续旋转,幕布+图标平滑淡出,露出旧版(无 3D 翻转)
   phase.value = 'reveal'
-  curtainStyle.value = { clipPath: 'none', transition: 'none' }
-  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: `opacity 0.25s ${SMOOTH}` }
-  faceStyle.value = { transform: 'rotateY(180deg)', transition: `transform 0.6s ${EASE}` }
+  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: `opacity 0.5s ${SMOOTH}` }
+  faceStyle.value = { opacity: '0', transition: `opacity 0.6s ${SMOOTH}` }
   await nextTick()
-  await onTransitionEnd(faceEl.value, 'transform', 750)
+  await onTransitionEnd(faceEl.value, 'opacity', 700)
 
   phase.value = 'done'
 }
@@ -228,7 +227,6 @@ defineExpose({ enter })
   position: fixed;
   inset: 0;
   z-index: 10000;
-  perspective: 1200px;
 }
 .legacy-iframe {
   position: absolute;
@@ -243,16 +241,18 @@ defineExpose({ enter })
   position: absolute;
   inset: 0;
   z-index: 2;
-  transform-style: preserve-3d;
   pointer-events: none;
 }
+/* 幕布背景:与 neu.css body 同款多层暖色光斑,延续当前页面背景(非纯色橙) */
 .legacy-curtain-face {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%),
+    radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%),
+    radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%),
+    radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
 }
 .legacy-fly-icon {
   position: fixed;
@@ -260,13 +260,23 @@ defineExpose({ enter })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--accent);
   pointer-events: none;
   will-change: transform, opacity;
 }
 .legacy-fly-icon :deep(svg) {
   width: 100%;
   height: 100%;
+}
+/* 图标持续旋转:外层 fly-icon 管 translate+scale,内层 svg 管 spin,互不干扰 */
+.legacy-fly-icon :deep(.legacy-spin) {
+  animation: legacy-spin 1.1s linear infinite;
+  transform-origin: 50% 50%;
+}
+@keyframes legacy-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .legacy-back {
   position: fixed;
@@ -307,6 +317,9 @@ defineExpose({ enter })
 @media (prefers-reduced-motion: reduce) {
   .legacy-stage.is-closing {
     transition: none;
+  }
+  .legacy-fly-icon :deep(.legacy-spin) {
+    animation: none;
   }
 }
 </style>
