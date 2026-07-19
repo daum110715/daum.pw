@@ -164,8 +164,10 @@ async function enter(rect) {
   const tx = vw / 2 - target / 2 - rect.left
   const ty = vh / 2 - target / 2 - rect.top
   const scale = rect.width > 0 ? target / rect.width : 1
+  // 对角线 1.1 倍:偏心扩散(从按钮位)也能覆盖到最远角
+  const coverR = Math.hypot(vw, vh) * 1.1
   curtainStyle.value = {
-    clipPath: `circle(150% at ${cx}px ${cy}px)`,
+    clipPath: `circle(${coverR}px at ${cx}px ${cy}px)`,
     transition: `clip-path 0.5s ${SMOOTH}`,
   }
   iconStyle.value = {
