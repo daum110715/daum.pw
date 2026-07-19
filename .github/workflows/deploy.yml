@@ -36,6 +36,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Stage legacy site into dist
+        # legacy 旧版随站部署到 /legacy/,供主页「旧版」按钮跳转
+        # --exclude='.*' 跳过 .claude/.vscode/.gitignore 等开发配置
+        run: rsync -a --exclude='.*' legacy/ dist/legacy/
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

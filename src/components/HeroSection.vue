@@ -43,6 +43,17 @@
             height="22"
           />
         </a>
+        <!-- 旧版站点入口:指向随站部署的 legacy 子站(./legacy/) -->
+        <a
+          href="./legacy/"
+          class="social-icon"
+          aria-label="旧版站点"
+          title="旧版站点"
+          target="_blank"
+          rel="noopener"
+        >
+          <Icon icon="lucide:history" width="22" height="22" />
+        </a>
       </div>
 
     </div>
