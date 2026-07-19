@@ -14,9 +14,9 @@
         @load="onIframeLoad"
       />
 
-      <!-- 转圈图标:在「旧版」按钮与「返回新版」按钮两地之间平滑移动,自身持续 spin -->
+      <!-- 转圈图标:在「旧版」按钮与「返回新版」按钮两地之间平滑移动,done 时停在返回按钮图标位 -->
       <span
-        v-if="phase !== 'idle' && phase !== 'done'"
+        v-if="phase !== 'idle'"
         ref="flyIconEl"
         class="legacy-fly-icon"
         :style="iconStyle"
@@ -26,7 +26,6 @@
 
       <!-- 返回新版 -->
       <button v-if="phase === 'done'" class="legacy-back" type="button" @click="exit($event)">
-        <Icon icon="lucide:arrow-left" width="20" height="20" />
         <span>返回新版</span>
       </button>
     </div>
@@ -46,9 +45,9 @@ const reduced =
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// 「返回新版」按钮中心预设(.legacy-back: top18 left18,约 w114 h44 -> 中心 75,40)
+// 「返回新版」按钮图标位中心(.legacy-back top18 left18,去 arrow-left 后图标 left36 top32 -> 中心 46,42)
 // enter 时该按钮尚未显示,用预设;exit 时按钮已显示,用实际 rect
-const RETURN_CENTER = { x: 75, y: 40 }
+const RETURN_CENTER = { x: 46, y: 42 }
 
 // idle -> enter -> cover -> reveal -> done -> returning -> returning-out -> idle
 const phase = ref('idle')
@@ -180,13 +179,9 @@ async function enter(rect) {
     waitForLoad(),
   ])
 
-  // reveal:品牌字 + 图标淡出,等 iframe 淡入完
+  // reveal:等 iframe 淡入完(图标保持显示,停留返回按钮图标位)
   phase.value = 'reveal'
-  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.4s var(--ease)' }
-  await Promise.all([
-    onTransitionEnd(flyIconEl.value, 'opacity', 500),
-    onTransitionEnd(iframeEl.value, 'opacity', 700),
-  ])
+  await onTransitionEnd(iframeEl.value, 'opacity', 700)
 
   phase.value = 'done'
 }
@@ -194,12 +189,12 @@ async function enter(rect) {
 /** 返回新版:图标从「返回新版」按钮位飞回「旧版」按钮位(反向) */
 async function exit(event) {
   if (phase.value !== 'done') return
-  // origin:返回按钮内图标 svg 位(Esc 无 event,用预设返回按钮中心)
+  // origin:返回按钮内图标位(Esc 无 event,用预设返回按钮图标位)
   const backBtn = event && event.currentTarget
   const backSvg = backBtn && backBtn.querySelector('svg')
   const originRect =
     (backSvg && backSvg.getBoundingClientRect()) ||
-    { left: RETURN_CENTER.x - 9, top: RETURN_CENTER.y - 9, width: 18, height: 18 }
+    { left: RETURN_CENTER.x - 10, top: RETURN_CENTER.y - 10, width: 20, height: 20 }
 
   iconStyle.value = {
     left: originRect.left + 'px',
@@ -296,7 +291,7 @@ defineExpose({ enter })
 }
 .legacy-fly-icon {
   position: fixed;
-  z-index: 3;
+  z-index: 6;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -315,7 +310,7 @@ defineExpose({ enter })
 }
 @keyframes legacy-spin {
   to {
-    transform: rotate(360deg);
+    transform: rotate(-360deg);
   }
 }
 /* 返回新版:与 HeroSection「旧版」入口(.legacy-link)同款风格,两个按钮对偶 */
@@ -328,7 +323,7 @@ defineExpose({ enter })
   align-items: center;
   gap: 8px;
   height: 48px;
-  padding: 0 18px;
+  padding: 0 18px 0 46px; /* 左 46 留 fly-icon 图标位(替代 arrow-left) */
   border-radius: var(--radius);
   background: var(--bg-2);
   color: var(--text);
