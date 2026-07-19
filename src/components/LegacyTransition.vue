@@ -1,12 +1,11 @@
 <template>
   <Teleport to="body">
     <div
-      v-if="active"
       class="legacy-stage"
       :class="`is-${phase}`"
       :aria-hidden="phase === 'idle' ? 'true' : undefined"
     >
-      <!-- 旧版 iframe:全屏,平滑淡入(与新版 main 淡出交叉,无遮罩) -->
+      <!-- 旧版 iframe:常驻预加载,过渡时与新版 main 景深交叉(无遮罩) -->
       <iframe
         ref="iframeEl"
         class="legacy-iframe"
@@ -38,8 +37,7 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 
-defineProps({ active: Boolean })
-const emit = defineEmits(['exit', 'fading'])
+const emit = defineEmits(['fading'])
 
 // 与 main.js 开屏动画同源回弹缓动
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
@@ -49,7 +47,6 @@ const reduced =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // idle -> enter -> cover -> reveal -> done -> closing -> idle
-// (reduced/后台: idle -> loading -> done)
 const phase = ref('idle')
 const iframeSrc = ref('')
 const iconStyle = ref({})
@@ -119,10 +116,9 @@ async function enter(rect) {
   if (phase.value !== 'idle') return
   savedOverflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
-  loadDone = false
-  iframeSrc.value = './legacy/'
+  // iframe 未预加载则立即加载(预加载下此分支不触发)
+  if (!iframeSrc.value) iframeSrc.value = './legacy/'
 
-  // reduced-motion / 后台标签页:跳过动画,等加载后直接呈现
   if (reduced || document.hidden) {
     phase.value = 'loading'
     emit('fading', true)
@@ -131,7 +127,7 @@ async function enter(rect) {
     return
   }
 
-  // 图标克隆到按钮位,旋转放大飞向屏幕中心(自身持续 spin)
+  // 图标克隆到按钮位
   iconStyle.value = {
     left: rect.left + 'px',
     top: rect.top + 'px',
@@ -141,10 +137,13 @@ async function enter(rect) {
     opacity: '1',
     transition: 'none',
   }
+  // 同步触发:新版 main 淡出+缩小 与 旧版 iframe 淡入+放大(景深交叉),无遮罩、无等待
   phase.value = 'enter'
+  emit('fading', true)
   await nextTick()
   await nextFrame()
 
+  // 图标旋转放大飞向屏幕中心(自身持续 spin)
   const vw = window.innerWidth
   const vh = window.innerHeight
   const target = Math.min(vw, vh) * 0.2
@@ -162,18 +161,18 @@ async function enter(rect) {
   }
   phase.value = 'cover'
 
-  // 图标飞到位 与 iframe 加载 并行,都完成才交叉过渡
+  // 图标飞到位 与 iframe 加载(预加载下即时) 并行
   await Promise.all([
     onTransitionEnd(flyIconEl.value, 'transform', 600),
     waitForLoad(),
   ])
 
-  // reveal:通知新版 main 淡出 + 旧版 iframe 平滑淡入 + 图标淡出(三者同步交叉,无遮罩)
-  phase.value = 'reveal'
-  emit('fading', true)
-  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.5s var(--ease)' }
-  await nextTick()
-  await onTransitionEnd(iframeEl.value, 'opacity', 700)
+  // 图标淡出(旧版已显现),等 iframe 淡入完
+  iconStyle.value = { ...iconStyle.value, opacity: '0', transition: 'opacity 0.4s var(--ease)' }
+  await Promise.all([
+    onTransitionEnd(flyIconEl.value, 'opacity', 500),
+    onTransitionEnd(iframeEl.value, 'opacity', 700),
+  ])
 
   phase.value = 'done'
 }
@@ -181,25 +180,30 @@ async function enter(rect) {
 function exit() {
   if (phase.value === 'idle' || phase.value === 'closing') return
   phase.value = 'closing'
-  emit('fading', false) // 新版 main 同步淡入恢复
+  emit('fading', false) // 新版 main 淡入恢复
   window.setTimeout(() => {
     reset()
-    emit('exit')
   }, 420)
 }
 
 function reset() {
   phase.value = 'idle'
-  iframeSrc.value = ''
   iconStyle.value = {}
   document.body.style.overflow = savedOverflow
-  loadDone = false
+  // iframe src 与 loadDone 保留:下次 enter 即时(已预加载)
 }
 
 function onKey(e) {
   if (e.key === 'Escape' && phase.value === 'done') exit()
 }
-onMounted(() => window.addEventListener('keydown', onKey))
+
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  // 开屏结束后预加载旧版(避免与 preloader 抢带宽);idle 时隐藏不挡新版
+  window.setTimeout(() => {
+    if (phase.value === 'idle' && !iframeSrc.value) iframeSrc.value = './legacy/'
+  }, 3000)
+})
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 defineExpose({ enter })
@@ -210,7 +214,10 @@ defineExpose({ enter })
   position: fixed;
   inset: 0;
   z-index: 10000;
-  /* 透明:不遮新版,让新版 main 淡出 + 旧版 iframe 淡入交叉过渡(无遮罩) */
+  pointer-events: none; /* idle 不挡新版交互 */
+}
+.legacy-stage:not(.is-idle) {
+  pointer-events: auto;
 }
 .legacy-iframe {
   position: absolute;
@@ -220,11 +227,17 @@ defineExpose({ enter })
   border: 0;
   background: var(--bg);
   opacity: 0;
-  transition: opacity 0.6s var(--ease);
+  transform: scale(0.94);
+  transform-origin: center;
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
 }
+/* enter/cover/reveal/done:旧版平滑淡入+放大到位(与新版 main 淡出+缩小景深交叉) */
+.legacy-stage.is-enter .legacy-iframe,
+.legacy-stage.is-cover .legacy-iframe,
 .legacy-stage.is-reveal .legacy-iframe,
 .legacy-stage.is-done .legacy-iframe {
   opacity: 1;
+  transform: scale(1);
 }
 .legacy-fly-icon {
   position: fixed;
@@ -282,6 +295,10 @@ defineExpose({ enter })
 @media (prefers-reduced-motion: reduce) {
   .legacy-stage.is-closing {
     transition: none;
+  }
+  .legacy-iframe {
+    transform: none !important;
+    transition: opacity 0.6s var(--ease);
   }
   .legacy-fly-icon :deep(.legacy-spin) {
     animation: none;

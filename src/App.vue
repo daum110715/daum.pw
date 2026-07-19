@@ -3,12 +3,7 @@
   <main :class="{ 'is-legacy-fading': legacyFading }">
     <HeroSection @enter-legacy="onEnterLegacy" />
   </main>
-  <LegacyTransition
-    ref="legacyRef"
-    :active="legacyActive"
-    @fading="onLegacyFading"
-    @exit="legacyActive = false"
-  />
+  <LegacyTransition ref="legacyRef" @fading="onLegacyFading" />
 </template>
 
 <script setup>
@@ -20,12 +15,10 @@ import { useReveal } from '@/composables/useReveal'
 
 useReveal()
 
-const legacyActive = ref(false)
 const legacyFading = ref(false)
 const legacyRef = ref(null)
 
 function onEnterLegacy(rect) {
-  legacyActive.value = true
   legacyRef.value?.enter(rect)
 }
 function onLegacyFading(v) {
@@ -35,10 +28,12 @@ function onLegacyFading(v) {
 
 <style scoped>
 main {
-  transition: opacity 0.6s var(--ease);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  transform-origin: center;
 }
 main.is-legacy-fading {
   opacity: 0;
+  transform: scale(0.94);
 }
 .theme-floating {
   position: fixed;
