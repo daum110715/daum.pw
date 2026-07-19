@@ -187,7 +187,7 @@ async function enter(rect) {
   // reveal:图标持续旋转,幕布+图标平滑淡出,露出旧版(无 3D 翻转)
   phase.value = 'reveal'
   iconStyle.value = { ...iconStyle.value, opacity: '0', transition: `opacity 0.5s ${SMOOTH}` }
-  faceStyle.value = { opacity: '0', transition: `opacity 0.6s ${SMOOTH}` }
+  faceStyle.value = { opacity: '0', transition: 'opacity 0.6s var(--ease)' }
   await nextTick()
   await onTransitionEnd(faceEl.value, 'opacity', 700)
 
@@ -227,6 +227,7 @@ defineExpose({ enter })
   position: fixed;
   inset: 0;
   z-index: 10000;
+  background: var(--bg); /* iframe 淡入中间态兜底,不透到新版页面 */
 }
 .legacy-iframe {
   position: absolute;
@@ -236,6 +237,13 @@ defineExpose({ enter })
   border: 0;
   background: var(--bg);
   z-index: 1;
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+}
+/* reveal/done:旧版内容平滑淡入(与幕布淡出同步) */
+.legacy-stage.is-reveal .legacy-iframe,
+.legacy-stage.is-done .legacy-iframe {
+  opacity: 1;
 }
 .legacy-curtain {
   position: absolute;
