@@ -1,5 +1,5 @@
 <template>
-  <ThemeToggle class="theme-floating" />
+  <ThemeToggle class="theme-floating reveal reveal-after-boot" />
   <main>
     <HeroSection />
   </main>
