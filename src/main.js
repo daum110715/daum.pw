@@ -38,11 +38,24 @@ const reduced =
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const MOVE_MS = 780
+/** 品牌字飞行:略带回弹感的 ease-out */
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
-/** 进度条 → 主题切换按钮 变形时长 */
-const MORPH_MS = 620
-/** 与 index.html pl-draw 一致: 0.15 + 8×0.1 + 0.5 */
-const DRAW_MS = 150 + 800 + 500
+/**
+ * 进度条走满 + 变形统一 smooth 缓动(无折点)。
+ * 走满由 runProgressFill 精确驱动,禁止中途 freeze 硬拉满。
+ */
+const SMOOTH = 'cubic-bezier(0.45, 0.05, 0.25, 1)'
+/** 变形与字飞行同长,两者并行 */
+const MORPH_MS = MOVE_MS
+/** 真正走满 100% 后再停顿,然后飞/变形 */
+const HOLD_MS = 500
+/**
+ * 与品牌描边同窗:
+ * 首字 delay 0.15s, 末字结束 1.45s → 进度 0.15s 起步、1.3s 走满
+ */
+const BRAND_DRAW_DELAY_MS = 150
+const BRAND_DRAW_SPAN_MS = 1300
+const DRAW_MS = BRAND_DRAW_DELAY_MS + BRAND_DRAW_SPAN_MS
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -59,16 +72,121 @@ const nextFrame = () =>
     window.setTimeout(fin, 50)
   })
 
-/** 进度条推进:首次接管先同步 CSS animation 当前值再清掉,避免跳回 0 */
-function setProgress(fill, ratio) {
+/**
+ * 进度条 0→100%:与描边同窗,单一 transition 走满。
+ * 等 transitionend 才算完成——绝不在中途把宽度硬拉满。
+ */
+async function runProgressFill(fill) {
   if (!fill) return
-  if (fill.style.animation !== 'none') {
-    const cur = getComputedStyle(fill).width
-    fill.style.animation = 'none'
-    fill.style.width = cur
-    void fill.offsetWidth
+  fill.style.animation = 'none'
+  fill.style.transition = 'none'
+  fill.style.width = '0%'
+  void fill.offsetWidth
+
+  if (reduced) {
+    fill.style.width = '100%'
+    return
   }
-  fill.style.width = (ratio * 100).toFixed(1) + '%'
+
+  await wait(BRAND_DRAW_DELAY_MS)
+  fill.style.transition = `width ${BRAND_DRAW_SPAN_MS}ms ${SMOOTH}`
+  fill.style.width = '100%'
+
+  await new Promise((resolve) => {
+    let done = false
+    const fin = () => {
+      if (done) return
+      done = true
+      fill.removeEventListener('transitionend', onEnd)
+      resolve()
+    }
+    const onEnd = (e) => {
+      if (e.target === fill && e.propertyName === 'width') fin()
+    }
+    fill.addEventListener('transitionend', onEnd)
+    window.setTimeout(fin, BRAND_DRAW_SPAN_MS + 80)
+  })
+
+  // 已在 100%,只去 transition 锁定,不改视觉宽度
+  fill.style.transition = 'none'
+  fill.style.width = '100%'
+}
+
+/** handoff 时钉成像素宽(此时必已 100%,仅供变形测 rect) */
+function freezeProgress(fill) {
+  if (!fill) return
+  const parent = fill.parentElement
+  const fullPx = parent
+    ? parent.getBoundingClientRect().width
+    : fill.getBoundingClientRect().width
+  fill.style.transition = 'none'
+  fill.style.animation = 'none'
+  fill.style.width = fullPx.toFixed(2) + 'px'
+  fill.style.height = '100%'
+}
+
+function boxKeyframes(from, to) {
+  const frame = (r) => ({
+    left: r.left + 'px',
+    top: r.top + 'px',
+    width: r.width + 'px',
+    height: r.height + 'px',
+  })
+  return [frame(from), frame(to)]
+}
+
+function pinFixedBox(node, rect, z) {
+  node.style.transition = 'none'
+  node.style.animation = 'none'
+  node.style.position = 'fixed'
+  node.style.left = rect.left + 'px'
+  node.style.top = rect.top + 'px'
+  node.style.width = rect.width + 'px'
+  node.style.height = rect.height + 'px'
+  node.style.right = 'auto'
+  node.style.bottom = 'auto'
+  node.style.margin = '0'
+  node.style.zIndex = String(z)
+  node.style.pointerEvents = 'none'
+  node.style.borderRadius = '9999px'
+}
+
+/**
+ * 进度条 → 主题按钮:WAAPI 单段插值,与字飞行并行。
+ * 轨道/填充均为 body 级 fixed,视口绝对几何,无父子裁切。
+ */
+async function morphBarToToggle(prog, fill, trackEnd, thumbEnd) {
+  const trackStart = prog.getBoundingClientRect()
+  // 满格时填充应铺满轨道
+  const fillStart = {
+    left: trackStart.left,
+    top: trackStart.top,
+    width: trackStart.width,
+    height: trackStart.height,
+  }
+
+  freezeProgress(fill)
+  if (fill.parentElement !== document.body) document.body.appendChild(fill)
+  if (prog.parentElement !== document.body) document.body.appendChild(prog)
+
+  pinFixedBox(prog, trackStart, 10002)
+  prog.style.overflow = 'visible'
+  prog.style.background = getComputedStyle(prog).backgroundColor || 'var(--bg-2)'
+  pinFixedBox(fill, fillStart, 10003)
+  fill.style.background = getComputedStyle(fill).backgroundColor || 'var(--accent)'
+
+  await nextFrame()
+
+  const opts = { duration: MORPH_MS, easing: SMOOTH, fill: 'forwards' }
+  const aTrack = prog.animate(boxKeyframes(trackStart, trackEnd), opts)
+  const aFill = fill.animate(boxKeyframes(fillStart, thumbEnd), opts)
+  await Promise.all([aTrack.finished.catch(() => {}), aFill.finished.catch(() => {})])
+
+  // 提交终态,取消 WAAPI 残留
+  pinFixedBox(prog, trackEnd, 10002)
+  pinFixedBox(fill, thumbEnd, 10003)
+  aTrack.cancel()
+  aFill.cancel()
 }
 
 function brandInk() {
@@ -219,14 +337,13 @@ async function handoff() {
 
   const ink = syncInk()
 
-  // ---- A. 描边完成态 ----
+  // ---- A. 描边完成态(进度已在 boot 阶段完整走满并停顿过) ----
   finishDraw(paths, ink)
-  setProgress(progFill, 0.7)
+  freezeProgress(progFill)
   void brand.offsetWidth
   await nextFrame()
 
   const pre = brand.getBoundingClientRect()
-  // brand 异常零尺寸(被 detach 等):硬退
   if (pre.width < 2 || pre.height < 2) {
     killPreloader(el)
     finishBoot(heroTitle)
@@ -234,7 +351,7 @@ async function handoff() {
     return
   }
 
-  // ---- B. 克隆 SVG,锁定到当前位置(fixed,视觉不动) ----
+  // ---- B. 克隆字 + 提升进度条(不随 preloader 隐藏) ----
   const clone = brand.cloneNode(true)
   clone.setAttribute('aria-hidden', 'true')
   clone.classList.add('pl-fly-svg')
@@ -246,126 +363,109 @@ async function handoff() {
   clone.style.margin = '0'
   clone.style.transformOrigin = '0 0'
   clone.style.willChange = 'transform'
-  clone.style.zIndex = '10003'
+  clone.style.zIndex = '10004'
   clone.style.pointerEvents = 'none'
   document.body.appendChild(clone)
 
-  // 进度条提前提升到 body 并锁定位置:不随 preloader 隐藏,飞行期间持续推进
   const prog = el.querySelector('.preloader__progress')
+  const fill = prog && prog.querySelector('.preloader__progress-fill')
   if (prog) {
     const pr = prog.getBoundingClientRect()
     document.body.appendChild(prog)
-    prog.style.position = 'fixed'
-    prog.style.left = pr.left + 'px'
-    prog.style.top = pr.top + 'px'
-    prog.style.width = pr.width + 'px'
-    prog.style.height = pr.height + 'px'
-    prog.style.margin = '0'
-    prog.style.zIndex = '10002'
+    pinFixedBox(prog, pr, 10002)
+    prog.style.borderRadius = '9999px'
+    prog.style.overflow = 'hidden'
   }
 
-  // 幕布硬切隐藏(无淡化)
   brand.style.visibility = 'hidden'
   el.style.visibility = 'hidden'
   el.style.pointerEvents = 'none'
+  killPreloader(el)
   await nextFrame()
 
-  // ---- C. 量终点,transform 飞行(同源同墨迹比例,矢量缩放不糊) ----
+  // ---- C+E 并行:字飞向 Hero + 进度条变形为 ThemeToggle(同长同节奏,条不满格停住) ----
   const to = heroSvg.getBoundingClientRect()
   const dx = to.left - pre.left
   const dy = to.top - pre.top
   const sx = pre.width > 0 ? to.width / pre.width : 1
   const sy = pre.height > 0 ? to.height / pre.height : 1
 
-  clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
-  await nextFrame()
-  clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
-  setProgress(progFill, 0.85)
-
-  await onTransformEnd(clone, MOVE_MS + 200)
-
-  // ---- D. 落地:Hero SVG 亮起(被克隆盖住),下一帧移除克隆(同源零跳变) ----
-  clone.style.transition = 'none'
-  heroTitle.classList.remove('handoff-pending')
-  heroTitle.classList.add('is-landed')
-  void heroSvg.offsetWidth
-
-  await nextFrame()
-  clone.remove()
-
-  // ---- E. 进度条走满 → 变形为主题切换按钮(轨道同高同色、填充同色) ----
-  // prog 已在 B 段提升到 body(不随 preloader 隐藏,全程可见)
-  const fill = prog && prog.querySelector('.preloader__progress-fill')
   const toggleEl = document.querySelector('.theme-floating')
   const track = toggleEl && toggleEl.querySelector('.track')
   const thumb = toggleEl && toggleEl.querySelector('.thumb')
 
-  if (!(prog && fill && track && thumb)) {
-    if (prog) prog.remove()
-    killPreloader(el)
-    finishBoot(heroTitle)
-    revealToggle()
-    return
+  let trackEnd = null
+  let thumbEnd = null
+  if (toggleEl && track && thumb) {
+    toggleEl.style.transition = 'none'
+    toggleEl.style.transform = 'none'
+    void toggleEl.offsetWidth
+    trackEnd = track.getBoundingClientRect()
+    thumbEnd = thumb.getBoundingClientRect()
   }
 
-  setProgress(fill, 1)
-  killPreloader(el)
+  clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
+  await nextFrame()
+  clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+
+  const brandP = onTransformEnd(clone, MOVE_MS + 200)
+  const morphP =
+    prog && fill && trackEnd && thumbEnd
+      ? morphBarToToggle(prog, fill, trackEnd, thumbEnd)
+      : Promise.resolve()
+
+  await Promise.all([brandP, morphP])
+
+  // ---- D. 字落地 + 真按钮接管(假层同位瞬亮后卸) ----
+  clone.style.transition = 'none'
+  heroTitle.classList.remove('handoff-pending')
+  heroTitle.classList.add('is-landed')
+  void heroSvg.offsetWidth
+  await nextFrame()
+  clone.remove()
+
   finishBoot(heroTitle)
 
-  await wait(400) // 等填充走满(0.35s transition)
-
-  // 变形:长条 → 64px 轨道,填充 → thumb 圆,同时平移到按钮位。
-  // 目标形态直接量真按钮 rect,亮/暗拇指位自动一致。
-  // 注意:真按钮未点亮时带 reveal 的 translateY(22px) 位移,且 .reveal 有
-  // 0.6s 过渡——须先禁过渡再清 transform,才能量到最终静止位,
-  // 否则变形终点偏下 22px、接管瞬间跳变。
-  toggleEl.style.transition = 'none'
-  toggleEl.style.transform = 'none'
-  const trackRect = track.getBoundingClientRect()
-  const thumbRect = thumb.getBoundingClientRect()
-  toggleEl.style.transform = ''
-  toggleEl.style.transition = ''
-
-  const fillRect = fill.getBoundingClientRect()
-  fill.style.width = fillRect.width + 'px'
-  fill.style.height = fillRect.height + 'px'
-  void fill.offsetWidth
-
-  prog.style.transition = `left ${MORPH_MS}ms ${EASE}, top ${MORPH_MS}ms ${EASE}, width ${MORPH_MS}ms ${EASE}`
-  fill.style.transition = `width ${MORPH_MS}ms ${EASE}, height ${MORPH_MS}ms ${EASE}, margin ${MORPH_MS}ms ${EASE}`
-  prog.style.left = trackRect.left + 'px'
-  prog.style.top = trackRect.top + 'px'
-  prog.style.width = trackRect.width + 'px'
-  fill.style.width = thumbRect.width + 'px'
-  fill.style.height = thumbRect.height + 'px'
-  fill.style.marginLeft = thumbRect.left - trackRect.left + 'px'
-  fill.style.marginTop = thumbRect.top - trackRect.top + 'px'
-
-  await wait(MORPH_MS + 120)
-
-  // 真按钮在假进度条正下方同位同形瞬亮,下一帧移除假进度条(零跳变)
-  revealToggle(true)
-  await nextFrame()
-  prog.remove()
+  if (prog && fill && trackEnd) {
+    revealToggle(true)
+    if (toggleEl) toggleEl.style.transform = ''
+    await nextFrame()
+    prog.remove()
+    fill.remove()
+  } else {
+    if (prog) prog.remove()
+    if (fill) fill.remove()
+    revealToggle()
+  }
 }
 
 /* boot */
 syncInk()
 assertBrandSync()
+const bootFill = document.querySelector('.preloader__progress-fill')
+const bootCatch = () => {
+  document.querySelectorAll('.pl-fly-svg').forEach((n) => n.remove())
+  document.querySelectorAll('body > .preloader__progress, body > .preloader__progress-fill').forEach((n) => n.remove())
+  killPreloader(document.getElementById('preloader'))
+  finishBoot(document.querySelector('.hero-title'))
+  revealToggle()
+}
 if (reduced) {
-  // reduced:不等字体竞态,即时呈现
-  wait(0).then(handoff)
+  if (bootFill) {
+    bootFill.style.transition = 'none'
+    bootFill.style.width = '100%'
+  }
+  wait(0).then(handoff).catch(bootCatch)
 } else {
+  // 等:字体 + 描边窗 + 进度条真正 transition 到 100% → 停顿 0.5s → 再飞/变形
   Promise.all([
     Promise.race([(document.fonts && document.fonts.ready) || Promise.resolve(), wait(2000)]),
-    wait(DRAW_MS + 60),
+    wait(DRAW_MS),
+    runProgressFill(bootFill),
   ])
-    .then(handoff)
-    .catch(() => {
-      document.querySelectorAll('.pl-fly-svg').forEach((n) => n.remove())
-      document.querySelectorAll('body > .preloader__progress').forEach((n) => n.remove())
-      killPreloader(document.getElementById('preloader'))
-      finishBoot(document.querySelector('.hero-title'))
-      revealToggle()
+    .then(async () => {
+      await wait(HOLD_MS)
+      return handoff()
     })
+    .catch(bootCatch)
 }

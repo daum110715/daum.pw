@@ -142,11 +142,10 @@
       width: auto;
       overflow: visible;
     }
-    /* 加载进度条:轨道高/色与主题切换按钮一致,填充与 thumb 同色——
-       走满后宽度收至 64px、填充收成圆,无缝变形为 ThemeToggle(main.js E 段) */
+    /* 加载进度条:loading 期间细轨;main.js 变形时再胀成 ThemeToggle 32px 轨 + thumb */
     .preloader__progress {
       width: clamp(150px, 34vw, 210px);
-      height: 32px;
+      height: 6px;
       border-radius: var(--radius-full);
       background: var(--bg-2);
       overflow: hidden;
@@ -156,13 +155,7 @@
       height: 100%;
       border-radius: var(--radius-full);
       background: var(--accent);
-      transition: width 0.35s var(--ease);
-      /* 与描边动画同步起步先到 55%,之后由 main.js 关键点推进 */
-      animation: pl-progress-run 1.45s linear 0.15s both;
-    }
-    @keyframes pl-progress-run {
-      from { width: 0; }
-      to   { width: 55%; }
+      /* 宽度由 main.js runProgressFill 驱动(与描边同窗,走满后无跳变再停顿) */
     }
     /* 描边 → 填实:同一实色,填完去掉描边 */
     .pl-char-path {
@@ -204,8 +197,8 @@
         stroke-width: 0;
       }
       .preloader__progress-fill {
-        animation: none !important;
-        width: 100%;
+        width: 100% !important;
+        transition: none !important;
       }
     }
   </style>
