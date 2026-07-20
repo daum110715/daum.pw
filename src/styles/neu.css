@@ -123,24 +123,37 @@ html.theme-transition *::after {
     clip-path 0.4s var(--ease) !important;
 }
 
-/* ---------- 主题切换:虹膜揭示(View Transitions API) ----------
-   新主题快照自按钮圆心圆形展开覆盖旧主题快照(--theme-iris-* 由
-   ThemeToggle 按按钮位置注入)。reduced-motion 下 ThemeToggle 不触发
-   VT 直接切;不支持 VT 的浏览器回退到上面全站渐变。 */
-::view-transition-old(root) {
+/* ---------- 主题切换:帘形遮罩横拉(View Transitions API) ----------
+   新主题快照在上层,被帘形遮罩裁切:遮罩内是新主题,遮罩外仍是旧页。
+   遮罩运动由 ThemeToggle 点击时用连续弹簧函数烘焙的 24 帧关键帧
+   (theme-curtain-mask-baked,帧间线性插值,无速度突变)驱动:
+   顶部一拉到底、底部滞后被甩过顶部(拉过头),上挺下荡。
+   旧页在帘下轻压暗退远。reduced-motion / 不支持 VT 时回退到上面全站渐变。
+   按钮圆点(.thumb-lift,内包 .thumb)独立成组、不进根快照:实时渲染浮在
+   帘上,thumb 从点击瞬间起滑;胶囊背景(.track)留在根快照随帘揭示——
+   否则浅色模式(帘从左来、按钮在右上)要等帘边扫到才见圆点动,揭示时
+   位移已过大半,看起来"按钮没动画"。旧圆点快照直接隐藏,新快照取消默认淡入。 */
+.thumb-lift {
+  view-transition-name: theme-thumb;
+}
+::view-transition-old(theme-thumb) {
+  display: none;
+}
+::view-transition-new(theme-thumb) {
   animation: none;
+}
+::view-transition-old(root) {
+  animation: theme-curtain-under 0.9s ease both;
   z-index: 1;
 }
 ::view-transition-new(root) {
-  animation: theme-iris-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: theme-curtain-mask-baked 0.9s linear both;
   z-index: 2;
 }
-@keyframes theme-iris-in {
-  from {
-    clip-path: circle(0px at var(--theme-iris-x, 50%) var(--theme-iris-y, 50%));
-  }
+@keyframes theme-curtain-under {
+  /* 旧页在帘下轻压暗,衬出帘布厚度 */
   to {
-    clip-path: circle(var(--theme-iris-r, 150vmax) at var(--theme-iris-x, 50%) var(--theme-iris-y, 50%));
+    filter: brightness(0.94);
   }
 }
 

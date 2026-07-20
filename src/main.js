@@ -199,8 +199,10 @@ function pinFixedBox(node, rect, z) {
 /**
  * 进度条 → 主题按钮:WAAPI 单段插值,与字飞行并行。
  * 轨道/填充均为 body 级 fixed,视口绝对几何,无父子裁切。
+ * endBgs:真按钮轨道/圆点的计算背景(渐变),收尾瞬间同步到假层,
+ * 保证假层盖住真按钮的那一帧外观零差异。
  */
-async function morphBarToToggle(prog, fill, trackEnd, thumbEnd) {
+async function morphBarToToggle(prog, fill, trackEnd, thumbEnd, endBgs) {
   const trackStart = prog.getBoundingClientRect()
   // 满格时填充应铺满轨道
   const fillStart = {
@@ -227,7 +229,17 @@ async function morphBarToToggle(prog, fill, trackEnd, thumbEnd) {
   const aFill = fill.animate(boxKeyframes(fillStart, thumbEnd), opts)
   await Promise.all([aTrack.finished.catch(() => {}), aFill.finished.catch(() => {})])
 
-  // 提交终态,取消 WAAPI 残留
+  // 提交终态,取消 WAAPI 残留;假层背景同步真按钮(渐变/配色以按钮为准)
+  if (endBgs) {
+    if (endBgs.track) {
+      prog.style.backgroundColor = endBgs.track.color
+      prog.style.backgroundImage = endBgs.track.image
+    }
+    if (endBgs.thumb) {
+      fill.style.backgroundColor = endBgs.thumb.color
+      fill.style.backgroundImage = endBgs.thumb.image
+    }
+  }
   pinFixedBox(prog, trackEnd, 10002)
   pinFixedBox(fill, thumbEnd, 10003)
   aTrack.cancel()
@@ -441,12 +453,19 @@ async function handoff() {
 
   let trackEnd = null
   let thumbEnd = null
+  let endBgs = null
   if (toggleEl && track && thumb) {
     toggleEl.style.transition = 'none'
     toggleEl.style.transform = 'none'
     void toggleEl.offsetWidth
     trackEnd = track.getBoundingClientRect()
     thumbEnd = thumb.getBoundingClientRect()
+    const trackCs = getComputedStyle(track)
+    const thumbCs = getComputedStyle(thumb)
+    endBgs = {
+      track: { color: trackCs.backgroundColor, image: trackCs.backgroundImage },
+      thumb: { color: thumbCs.backgroundColor, image: thumbCs.backgroundImage },
+    }
   }
 
   clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
@@ -456,7 +475,7 @@ async function handoff() {
   const brandP = onTransformEnd(clone, MOVE_MS + 200)
   const morphP =
     prog && fill && trackEnd && thumbEnd
-      ? morphBarToToggle(prog, fill, trackEnd, thumbEnd)
+      ? morphBarToToggle(prog, fill, trackEnd, thumbEnd, endBgs)
       : Promise.resolve()
 
   await Promise.all([brandP, morphP])
