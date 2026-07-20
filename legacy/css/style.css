@@ -317,6 +317,32 @@ button {
   transition: clip-path 0.85s cubic-bezier(0.65, 0, 0.2, 1);
 }
 
+/* 新版来航到达幕布:与 ReturnNew 离场互为逆过程,首帧前以新版 --bg 满幅盖住,
+   main.js 加 .from-new-open 后 mask 虹膜开孔自点击同轴位置放大揭示;
+   --iris-r 经 @property 注册可过渡,不支持的浏览器退化为瞬时揭示(不罩死)。 */
+@property --iris-r {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+[data-from-new='1'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: var(--from-new-bg, #1a1410);
+  pointer-events: none;
+  --iris-r: 0px;
+  -webkit-mask-image: radial-gradient(circle var(--iris-r) at var(--tx, 50%) var(--ty, 50%), transparent calc(100% - 32px), #000 100%);
+  mask-image: radial-gradient(circle var(--iris-r) at var(--tx, 50%) var(--ty, 50%), transparent calc(100% - 32px), #000 100%);
+}
+
+html.from-new-open body::after {
+  --iris-r: 150vmax;
+  transition: --iris-r 0.9s cubic-bezier(0.65, 0, 0.2, 1);
+}
+
 @media (max-width: 640px) {
   .return-new {
     top: max(12px, env(safe-area-inset-top));

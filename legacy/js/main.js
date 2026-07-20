@@ -114,17 +114,22 @@ const BlobBackground = {
 
     const render = () => {
       container.innerHTML = '';
+      // animation-delay 用墙钟对齐:主题切换触发重渲染时 blob 动画相位由
+      // Date.now() 驱动,重渲染瞬间相位连续,避免 blob 因动画重新开始而跳一下
+      // (原 delay 0/-9/-5 作为 per-blob 错开偏移保留)。
+      const nowSec = Date.now() / 1000;
       this.BLOBS.forEach(({ size, dur, delay, dark, light }, i) => {
         const { c1, c2, opacity } = isDark() ? dark : light;
         const { cx, cy } = positions[i];
         const el = document.createElement('div');
         el.className = 'bg-blob';
         const half = size / 2;
+        const phaseDelay = -(((nowSec + delay) % dur + dur) % dur);
         el.style.cssText =
           `width:${size}px;height:${size}px;` +
           `left:calc(${cx}% - ${half}px);top:calc(${cy}% - ${half}px);` +
           `background:radial-gradient(circle at 45% 42%, ${c1} 0%, ${c2} 40%, transparent 68%);` +
-          `opacity:${opacity};animation-duration:${dur}s;animation-delay:${delay}s;`;
+          `opacity:${opacity};animation-duration:${dur}s;animation-delay:${phaseDelay}s;`;
         container.appendChild(el);
       });
     };
@@ -714,6 +719,32 @@ const ClawdVideoKeyer = {
 };
 
 /* ========================================
+   Arrive from New Version (虹膜开孔到岸)
+   index.html 首帧前挂 data-from-new + 满幅幕布(新版 --bg),
+   此处双 rAF 触发 mask 开孔自点击同轴位置放大揭示,
+   与 ReturnNew 离场虹膜严格互逆,同语言同节奏,往返零跳变。
+   ======================================== */
+
+const ArriveNew = {
+  OPEN_MS: 950,
+
+  init() {
+    const root = document.documentElement;
+    if (root.getAttribute('data-from-new') !== '1') return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.add('from-new-open');
+      setTimeout(() => {
+        root.removeAttribute('data-from-new');
+        root.classList.remove('from-new-open');
+        root.style.removeProperty('--tx');
+        root.style.removeProperty('--ty');
+        root.style.removeProperty('--from-new-bg');
+      }, this.OPEN_MS);
+    }));
+  }
+};
+
+/* ========================================
    Return to New Version (虹膜收合离场)
    与新版「旧版」入场转场同一语言:circle clip-path +
    cubic-bezier(0.65,0,0.2,1) 0.85s;幕布色 = 新版当前主题 --bg,
@@ -770,6 +801,7 @@ const ReturnNew = {
    ======================================== */
 
 (async function bootstrap() {
+  ArriveNew.init();
   Grain.init();
   BlobBackground.init();
   MouseInteraction.init();

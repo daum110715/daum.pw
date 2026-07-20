@@ -23,6 +23,36 @@
       } catch (e) {}
     })();
   </script>
+  <script>
+    // 新版来航到达幕布:带 ?from=new 或会话内自新版跳转(sessionStorage 坐标标记),
+    // 首帧前挂到达标记,body::after 以新版 --bg(随 daum-theme)满幅盖住,
+    // main.js 在 boot 早期触发虹膜自新版点击同轴位置收拢揭示
+    (function () {
+      try {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var origin = sessionStorage.getItem('daum-from-new');
+        var fromParam = /[?&]from=new(?:&|$)/.test(window.location.search);
+        if (!fromParam && !origin) return;
+        var root = document.documentElement;
+        if (origin) {
+          var p = origin.split(',');
+          if (p.length === 2 && isFinite(p[0]) && isFinite(p[1])) {
+            root.style.setProperty('--tx', p[0] + 'px');
+            root.style.setProperty('--ty', p[1] + 'px');
+          }
+        }
+        root.style.setProperty('--from-new-bg',
+          localStorage.getItem('daum-theme') === 'light' ? '#fcfaf6' : '#1a1410');
+        root.setAttribute('data-from-new', '1');
+        sessionStorage.removeItem('daum-from-new');
+        // 兜底:main.js 未执行时绝不能罩住页面
+        window.setTimeout(function () {
+          root.removeAttribute('data-from-new');
+          root.classList.remove('from-new-open');
+        }, 4000);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="bg"></div>

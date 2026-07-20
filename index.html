@@ -114,29 +114,34 @@
     }
 
     /* ---------- 旧版回流到达幕布 ----------
-       与旧版 .return-veil 同一语言:circle clip-path + 0.9s
-       cubic-bezier(0.65,0,0.2,1);虹膜中心对齐旧版「新版」按钮位置
+       与旧版 .return-veil 离场互为逆过程:mask 虹膜开孔自同轴点放大揭示
        (fixed top/right 24px,48px 圆心 ≈ calc(100% - 48px) 48px),
-       离场从此点放大遮盖 → 到岸从此点收拢揭示,往返同轴。 */
+       0.9s cubic-bezier(0.65,0,0.2,1);--iris-r 经 @property 注册可过渡,
+       不支持的浏览器退化为瞬时揭示(无动画,不罩死)。 */
+    @property --iris-r {
+      syntax: '<length>';
+      inherits: false;
+      initial-value: 0px;
+    }
     [data-from-legacy='1'] body::after {
       content: '';
       position: fixed;
       inset: 0;
       z-index: 10010;
       background: var(--bg);
-      clip-path: circle(150vmax at calc(100% - 48px) 48px);
       pointer-events: none;
+      --iris-r: 0px;
+      -webkit-mask-image: radial-gradient(circle var(--iris-r) at calc(100% - 48px) 48px, transparent calc(100% - 32px), #000 100%);
+      mask-image: radial-gradient(circle var(--iris-r) at calc(100% - 48px) 48px, transparent calc(100% - 32px), #000 100%);
     }
     html.return-veil-open body::after {
-      clip-path: circle(0px at calc(100% - 48px) 48px);
-      transition: clip-path 0.9s cubic-bezier(0.65, 0, 0.2, 1);
+      --iris-r: 150vmax;
+      transition: --iris-r 0.9s cubic-bezier(0.65, 0, 0.2, 1);
     }
     @media (max-width: 640px) {
       [data-from-legacy='1'] body::after {
-        clip-path: circle(150vmax at calc(100% - 32px) 32px);
-      }
-      html.return-veil-open body::after {
-        clip-path: circle(0px at calc(100% - 32px) 32px);
+        -webkit-mask-image: radial-gradient(circle var(--iris-r) at calc(100% - 32px) 32px, transparent calc(100% - 32px), #000 100%);
+        mask-image: radial-gradient(circle var(--iris-r) at calc(100% - 32px) 32px, transparent calc(100% - 32px), #000 100%);
       }
     }
 

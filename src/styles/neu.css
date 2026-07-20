@@ -123,24 +123,24 @@ html.theme-transition *::after {
     clip-path 0.4s var(--ease) !important;
 }
 
-/* ---------- 主题切换:横向幕布(View Transitions API) ----------
-   新主题快照从右侧滑入覆盖旧主题快照(幕布感)。reduced-motion 下
-   ThemeToggle 不触发 VT 直接切;不支持 VT 的浏览器回退到上面全站渐变。 */
+/* ---------- 主题切换:虹膜揭示(View Transitions API) ----------
+   新主题快照自按钮圆心圆形展开覆盖旧主题快照(--theme-iris-* 由
+   ThemeToggle 按按钮位置注入)。reduced-motion 下 ThemeToggle 不触发
+   VT 直接切;不支持 VT 的浏览器回退到上面全站渐变。 */
 ::view-transition-old(root) {
   animation: none;
   z-index: 1;
 }
 ::view-transition-new(root) {
-  animation: theme-curtain-in 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: theme-iris-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
   z-index: 2;
 }
-@keyframes theme-curtain-in {
-  /* 方向跟按钮 thumb:dark 从左向右揭 / light 从右向左揭(--theme-curtain-from) */
+@keyframes theme-iris-in {
   from {
-    clip-path: var(--theme-curtain-from, inset(0 0 0 100%));
+    clip-path: circle(0px at var(--theme-iris-x, 50%) var(--theme-iris-y, 50%));
   }
   to {
-    clip-path: inset(0 0 0 0);
+    clip-path: circle(var(--theme-iris-r, 150vmax) at var(--theme-iris-x, 50%) var(--theme-iris-y, 50%));
   }
 }
 
