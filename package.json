@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "daum12569 的数字客厅 — 新拟态个人主页",
+  "description": "daum12569 的数字客厅 — 扁平化个人主页",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
