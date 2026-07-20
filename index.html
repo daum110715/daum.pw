@@ -23,6 +23,22 @@
       } catch (e) {}
     })();
   </script>
+  <script>
+    // 旧版回流转场:带 ?from=legacy 或本次会话去过旧版(sessionStorage 标记),
+    // 首帧前挂上到达幕布标记,body::after 以新版 --bg 满幅盖住,
+    // main.js 在 boot 早期触发虹膜展开,与旧版离场虹膜同语言同节奏
+    (function () {
+      try {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var fromParam = /[?&]from=legacy(?:&|$)/.test(window.location.search);
+        var flagged = sessionStorage.getItem('daum-legacy-visit') === '1';
+        if (fromParam || flagged) {
+          document.documentElement.setAttribute('data-from-legacy', '1');
+        }
+        sessionStorage.removeItem('daum-legacy-visit');
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- 无 JS 时隐藏 preloader,避免遮挡 noscript 提示 -->
   <noscript><style>#preloader { display: none !important; }</style></noscript>
@@ -95,6 +111,33 @@
       background-clip: border-box !important;
       color: var(--brand-ink, var(--accent-text)) !important;
       -webkit-text-fill-color: var(--brand-ink, var(--accent-text)) !important;
+    }
+
+    /* ---------- 旧版回流到达幕布 ----------
+       与旧版 .return-veil 同一语言:circle clip-path + 0.9s
+       cubic-bezier(0.65,0,0.2,1);虹膜中心对齐旧版「新版」按钮位置
+       (fixed top/right 24px,48px 圆心 ≈ calc(100% - 48px) 48px),
+       离场从此点放大遮盖 → 到岸从此点收拢揭示,往返同轴。 */
+    [data-from-legacy='1'] body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 10010;
+      background: var(--bg);
+      clip-path: circle(150vmax at calc(100% - 48px) 48px);
+      pointer-events: none;
+    }
+    html.return-veil-open body::after {
+      clip-path: circle(0px at calc(100% - 48px) 48px);
+      transition: clip-path 0.9s cubic-bezier(0.65, 0, 0.2, 1);
+    }
+    @media (max-width: 640px) {
+      [data-from-legacy='1'] body::after {
+        clip-path: circle(150vmax at calc(100% - 32px) 32px);
+      }
+      html.return-veil-open body::after {
+        clip-path: circle(0px at calc(100% - 32px) 32px);
+      }
     }
 
     /* ---------- Preloader ----------
@@ -239,6 +282,9 @@
     // 兜底:即便模块加载失败,4.5s 后也强制收尾,防止卡死
     (function () {
       window.setTimeout(function () {
+        // 到岸幕布兜底:模块失败时绝不能罩住页面
+        document.documentElement.removeAttribute('data-from-legacy');
+        document.documentElement.classList.remove('return-veil-open');
         var el = document.getElementById('preloader');
         if (el && el.dataset.done !== '1') {
           el.dataset.done = '1';

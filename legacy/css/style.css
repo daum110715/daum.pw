@@ -269,6 +269,69 @@ button {
 [data-theme="dark"] .icon-sun { opacity: 0; transform: rotate(-90deg) scale(0.5); }
 [data-theme="dark"] .icon-moon { opacity: 1; transform: rotate(0deg) scale(1); }
 
+/* 回到新版:与 theme-toggle 同材质(玻璃拟态),药丸形态 + 图标文字 */
+.return-new {
+  position: fixed;
+  top: 24px;
+  right: 84px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.3s, transform 0.3s, color 0.3s;
+}
+
+.return-new:hover {
+  transform: scale(1.05);
+  background: var(--surface-hover);
+  color: var(--accent, #f5b842);
+}
+
+.return-new svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 回新版转场幕布:圆形虹膜自点击处展开,颜色由 JS 按目标站主题注入 */
+.return-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  clip-path: circle(0px at var(--tx, 50%) var(--ty, 50%));
+}
+
+.return-veil.is-open {
+  clip-path: circle(150vmax at var(--tx, 50%) var(--ty, 50%));
+  transition: clip-path 0.85s cubic-bezier(0.65, 0, 0.2, 1);
+}
+
+@media (max-width: 640px) {
+  .return-new {
+    top: max(12px, env(safe-area-inset-top));
+    right: calc(max(12px, env(safe-area-inset-right)) + 52px);
+    height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .return-new svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 /* ========================================
    Sections
    ======================================== */

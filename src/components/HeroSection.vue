@@ -48,8 +48,7 @@
           href="./legacy/"
           class="legacy-link"
           title="旧版站点"
-          target="_blank"
-          rel="noopener"
+          @click="goLegacy"
         >
           <Icon icon="lucide:rotate-ccw" width="20" height="20" />
           <span>旧版</span>
@@ -58,13 +57,98 @@
 
     </div>
   </section>
+
+  <!-- 旧版转场:圆形幕布自点击处展开,幕后 iframe 预载旧版,就绪后无缝替换 -->
+  <Teleport to="body">
+    <div
+      v-if="legacyState !== 'idle'"
+      class="legacy-veil"
+      :class="[`is-${legacyState}`, { 'is-frame-ready': frameReady }]"
+      :style="veilOrigin"
+      aria-hidden="true"
+    >
+      <div class="legacy-veil-glow" />
+      <iframe
+        class="legacy-veil-frame"
+        src="./legacy/"
+        title="旧版站点"
+        tabindex="-1"
+        @load="onFrameLoad"
+      />
+      <div class="legacy-veil-hint">
+        <span class="legacy-veil-dot" />
+        <span>正在前往旧版</span>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
 
+const LEGACY_HREF = './legacy/'
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const MIN_VEIL_MS = 850
+const NAV_TIMEOUT_MS = 6000
+
+const legacyState = ref('idle')
+const frameReady = ref(false)
+const veilOrigin = ref({ '--tx': '50%', '--ty': '50%' })
+
+let navTimer = null
+let minTimer = null
+let frameLoaded = false
+let veilShownAt = 0
+
+const navigating = computed(() => legacyState.value === 'leaving')
+
+function goLegacy(e) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+  e.preventDefault()
+  if (legacyState.value !== 'idle') return
+  if (REDUCED) {
+    window.location.assign(LEGACY_HREF)
+    return
+  }
+  veilOrigin.value = { '--tx': `${e.clientX}px`, '--ty': `${e.clientY}px` }
+  try {
+    sessionStorage.setItem('daum-legacy-visit', '1')
+  } catch (err) {}
+  document.documentElement.style.overflow = 'hidden'
+  veilShownAt = performance.now()
+  legacyState.value = 'covering'
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (legacyState.value === 'covering') legacyState.value = 'covered'
+  }))
+  navTimer = setTimeout(navigate, NAV_TIMEOUT_MS)
+}
+
+function onFrameLoad() {
+  if (frameLoaded) return
+  frameLoaded = true
+  const wait = Math.max(0, MIN_VEIL_MS - (performance.now() - veilShownAt))
+  minTimer = setTimeout(() => {
+    frameReady.value = true
+    setTimeout(navigate, 420)
+  }, wait)
+}
+
+function navigate() {
+  if (legacyState.value === 'leaving') return
+  legacyState.value = 'leaving'
+  clearTimeout(navTimer)
+  clearTimeout(minTimer)
+  window.location.assign(LEGACY_HREF)
+}
+
+onBeforeUnmount(() => {
+  clearTimeout(navTimer)
+  clearTimeout(minTimer)
+  document.documentElement.style.overflow = ''
+})
 </script>
 
 <style scoped>
@@ -168,6 +252,98 @@ import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@
   width: 20px;
   height: 20px;
   overflow: visible;
+}
+
+/* ---------- 旧版转场幕布 ---------- */
+.legacy-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  clip-path: circle(0px at var(--tx, 50%) var(--ty, 50%));
+  pointer-events: none;
+}
+.legacy-veil.is-covered,
+.legacy-veil.is-leaving {
+  clip-path: circle(150vmax at var(--tx, 50%) var(--ty, 50%));
+  transition: clip-path 0.85s cubic-bezier(0.65, 0, 0.2, 1);
+}
+.legacy-veil-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle 38vmax at var(--tx, 50%) var(--ty, 50%),
+    var(--accent-soft),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+}
+.legacy-veil.is-covered .legacy-veil-glow {
+  opacity: 1;
+}
+.legacy-veil-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  transform: scale(1.03);
+  filter: blur(10px);
+  transition:
+    opacity 0.45s var(--ease),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.5s var(--ease);
+}
+.legacy-veil.is-frame-ready .legacy-veil-frame {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
+}
+.legacy-veil-hint {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(28px, 6vh, 56px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease) 0.35s;
+}
+.legacy-veil.is-covered .legacy-veil-hint {
+  opacity: 1;
+}
+.legacy-veil.is-frame-ready .legacy-veil-hint {
+  opacity: 0;
+  transition-delay: 0s;
+}
+.legacy-veil-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: legacy-veil-pulse 1s var(--ease) infinite;
+}
+@keyframes legacy-veil-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.7); opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legacy-veil,
+  .legacy-veil-glow,
+  .legacy-veil-frame,
+  .legacy-veil-hint {
+    transition: none;
+  }
+  .legacy-veil-dot {
+    animation: none;
+  }
 }
 
 </style>

@@ -215,6 +215,7 @@ const Theme = {
     const next = current === 'dark' ? 'light' : 'dark';
     this.html.setAttribute('data-theme', next);
     safeStorage.set(this.key, next);
+    safeStorage.set('daum-theme', next);
   }
 };
 
@@ -713,6 +714,58 @@ const ClawdVideoKeyer = {
 };
 
 /* ========================================
+   Return to New Version (虹膜收合离场)
+   与新版「旧版」入场转场同一语言:circle clip-path +
+   cubic-bezier(0.65,0,0.2,1) 0.85s;幕布色 = 新版当前主题 --bg,
+   抵达新版后同色幕布虹膜展开,往返零跳变。
+   ======================================== */
+
+const ReturnNew = {
+  VEIL_MS: 850,
+  NAV_DELAY_MS: 880,
+  NEW_BG: { light: '#fcfaf6', dark: '#1a1410' },
+
+  init() {
+    this.link = document.getElementById('returnNew');
+    if (!this.link) return;
+    this.reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.leaving = false;
+    this.link.addEventListener('click', (e) => this.go(e));
+  },
+
+  go(e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (this.leaving) return;
+    this.leaving = true;
+
+    const href = this.link.getAttribute('href');
+    if (this.reduced) {
+      window.location.assign(href);
+      return;
+    }
+
+    // 目标站主题(新版 daum-theme 已与旧版 theme 双向同步)
+    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+    const veil = document.createElement('div');
+    veil.className = 'return-veil';
+    veil.style.background = this.NEW_BG[dark ? 'dark' : 'light'];
+    veil.style.setProperty('--tx', e.clientX + 'px');
+    veil.style.setProperty('--ty', e.clientY + 'px');
+    document.body.appendChild(veil);
+
+    document.documentElement.style.overflow = 'hidden';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      veil.classList.add('is-open');
+    }));
+
+    setTimeout(() => window.location.assign(href), this.NAV_DELAY_MS);
+  }
+};
+
+/* ========================================
    Bootstrap
    ======================================== */
 
@@ -722,6 +775,7 @@ const ClawdVideoKeyer = {
   MouseInteraction.init();
   Theme.init();
   MobileNav.init();
+  ReturnNew.init();
 
   await DataLoader.load();
 
