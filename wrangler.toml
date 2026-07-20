@@ -1,0 +1,6 @@
+name = "daum-pw"
+compatibility_date = "2024-11-01"
+
+# 静态站点:直接把 dist/ 作为 assets 部署(Workers 静态资源托管)
+[assets]
+directory = "./dist"
