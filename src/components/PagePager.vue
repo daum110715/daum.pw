@@ -1,63 +1,71 @@
 <template>
-  <!-- tab 栏 = daum(Hero SVG 真身,钉在最左)+ 数字行。
-       数字是同字体 Outfit 800 的 DOM 按钮:落位瞬间 1/2/5/6/9 在 SVG
-       数字原位淡入(SVG 数字同步淡出,零跳变),随后 3/4/7/8 左→右
-       依次撑开,12569 展开成 123456789;daum 全程不动 -->
-  <nav
-    class="page-pager"
-    :class="{
-      'is-on': dockState !== 'hero',
-      'is-docked': dockState === 'docked',
-      'is-collapsing': dockState === 'collapsing',
-      'is-loose': loose,
-    }"
-    :style="pillStyle"
-    aria-label="页面分区导航"
-  >
+  <!-- tab 栏 = daum12569(Hero SVG 真身,飞上来后自身摊开)+ 数字行。
+       同一个元素到底:1/2/5/6/9 的视觉就是 Hero SVG 数字路径,
+       这里只做透明点击热区;3/4/7/8 从左侧邻居背后平移滑入新槽位。
+       全部由 flyP/flyEase(ScrollTrigger scrub 进度)驱动:
+       p 0→0.7 品牌字整体飞行;p 0.75→1 数字摊开、新数字滑入 -->
+  <nav class="page-pager" :style="pillStyle" aria-label="页面分区导航">
     <span class="daum-spacer" aria-hidden="true" />
     <button
       v-for="n in total"
       :key="n"
       class="pager-btn"
       :class="{ 'is-new': isNew(n), 'is-active': activePage === n }"
+      :style="isNew(n) ? { opacity: newO(n) } : undefined"
       :aria-label="`滚动到第 ${n} 页`"
       :aria-current="activePage === n ? 'page' : undefined"
-      :tabindex="dockState === 'docked' ? 0 : -1"
+      :tabindex="flyP >= 1 ? 0 : -1"
       @click="go(n)"
-    >{{ n }}</button>
+    ><span class="d" :style="isNew(n) ? { transform: `translateX(${slide(n)}px)` } : undefined">{{ n }}</span></button>
   </nav>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { dockGeo, dockState, activePage } from '@/composables/brandDock'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { dockGeo, flyP, flyEase, activePage } from '@/composables/brandDock'
 
 const total = 9
 const NEW_DIGITS = [3, 4, 7, 8]
 const isNew = (n) => NEW_DIGITS.includes(n)
 
-/* 两阶段:docked = 1/2/5/6/9 原位接替(紧凑槽,与 SVG 数字对齐零跳变);
-   250ms 后 loose = 全部槽加宽 + 3/4/7/8 撑开,数字行宽松化 */
-const loose = ref(false)
-let looseTimer = null
-watch(dockState, (s) => {
-  clearTimeout(looseTimer)
-  if (s === 'docked') looseTimer = setTimeout(() => (loose.value = true), 250)
-  else loose.value = false
-})
+/* 展开进度 = flyEase(Hero 已做 smoothstep):与 SVG 数字摊开同一条
+   曲线——槽宽撑开、3/4/7/8 补入,任意进度都与数字位置严丝合缝 */
+const ease = flyEase
 
-/* 胶囊:左缘钉死(daum 不动),接替时紧凑,loose 后向右长到 9 宽松槽 */
+/* 新数字平移入场:短距滑入——只往左藏 0.45 槽宽(左缘略 tucked 到
+   邻居右缘下,SVG 邻居 z 序在上遮住),大部分行程字形都在自己槽位
+   附近滑正,不与邻居字形交叠;4/8 比 3/7 晚 0.18 起步,组内错落 */
+function localT(n) {
+  const e = ease.value
+  if (n === 4 || n === 8) return Math.min(1, Math.max(0, (e - 0.18) / 0.82))
+  return e
+}
+
+function slide(n) {
+  const slotW = dockGeo.advance + dockGeo.gap * ease.value
+  return -(1 - localT(n)) * slotW * 0.45
+}
+
+/* 透明度:localT 前 45% 淡入,与滑入同步完成 */
+function newO(n) {
+  return Math.min(1, localT(n) / 0.45)
+}
+
 const pillStyle = computed(() => {
-  if (!dockGeo.ready) return {}
+  if (!dockGeo.ready) return { opacity: 0 }
+  const slotW = dockGeo.advance + dockGeo.gap * ease.value
+  const w = dockGeo.spacer + 5 * slotW + 4 * slotW * ease.value + 8
   return {
     left: `${dockGeo.left - 4}px`,
     top: `${dockGeo.top - 4}px`,
     height: `${dockGeo.h + 8}px`,
-    '--slot-w': `${dockGeo.advance}px`,
-    '--slot-w2': `${dockGeo.slotLoose}px`,
+    width: `${w}px`,
+    opacity: flyP.value > 0 ? 1 : 0,
+    pointerEvents: flyP.value >= 1 ? 'auto' : 'none',
+    '--slot-w': `${slotW}px`,
+    '--new-w': `${slotW * ease.value}px`,
+    '--new-o': ease.value,
     '--spacer-w': `${dockGeo.spacer}px`,
-    '--w-compact': `${dockGeo.wCompact}px`,
-    '--w-full': `${dockGeo.wFull}px`,
     '--digit-fs': `${dockGeo.digitH / 0.68}px`,
   }
 })
@@ -79,10 +87,7 @@ onMounted(() => {
   sections.forEach((s) => observer.observe(s))
 })
 
-onBeforeUnmount(() => {
-  observer && observer.disconnect()
-  clearTimeout(looseTimer)
-})
+onBeforeUnmount(() => observer && observer.disconnect())
 
 function go(n) {
   const el = sections[n - 1]
@@ -98,21 +103,10 @@ function go(n) {
   z-index: 50;
   display: flex;
   align-items: center;
-  width: var(--w-compact);
   padding: 0 4px;
   opacity: 0;
   pointer-events: none;
   overflow: hidden;
-  transition:
-    opacity 0.45s var(--ease),
-    width 0.5s cubic-bezier(0.45, 0.05, 0.25, 1);
-}
-.page-pager.is-on {
-  opacity: 1;
-  pointer-events: auto;
-}
-.page-pager.is-loose {
-  width: var(--w-full);
 }
 .daum-spacer {
   width: var(--spacer-w);
@@ -130,42 +124,25 @@ function go(n) {
   font-weight: 800;
   font-size: var(--digit-fs);
   line-height: 1;
-  color: color-mix(in srgb, var(--accent-2) 55%, white);
+  /* 1/2/5/6/9:文字透明(视觉=底下的 SVG 真身),仅作点击热区 */
+  color: transparent;
   overflow: hidden;
-  opacity: 0;
   transition:
-    width 0.5s cubic-bezier(0.45, 0.05, 0.25, 1),
-    opacity 0.3s var(--ease),
     color var(--dur) var(--ease),
     background var(--dur) var(--ease);
 }
-/* 落位后 1/2/5/6/9 立即淡入(紧凑槽原位接替 SVG 数字);
-   loose 后所有槽加宽、3/4/7/8 宽 0 → 宽松槽,数字行整体左→右宽松化。
-   collapsing(收回):1/2/5/6/9 保持可见、随槽宽滑回紧凑位,3/4/7/8 收没 */
-.is-docked .pager-btn,
-.is-collapsing .pager-btn:not(.is-new) {
-  opacity: 1;
-}
-.is-loose .pager-btn {
-  width: var(--slot-w2);
-}
 .pager-btn.is-new {
-  width: 0;
+  width: var(--new-w);
+  /* 不裁剪:字形向左探出按钮,被 SVG 邻居(z-60)遮住,
+     缝隙打开时从邻居背后滑出 */
+  overflow: visible;
+  color: color-mix(in srgb, var(--accent-2) 55%, white);
 }
-.is-loose .pager-btn.is-new {
-  width: var(--slot-w2);
-  opacity: 1;
+/* 新数字字形:平移滑入的载体(inline-block 才可 transform) */
+.pager-btn .d {
+  display: inline-block;
 }
 .pager-btn:hover {
   background: var(--accent-soft);
-}
-.pager-btn.is-active {
-  color: var(--accent);
-}
-@media (prefers-reduced-motion: reduce) {
-  .page-pager,
-  .pager-btn {
-    transition: none;
-  }
 }
 </style>

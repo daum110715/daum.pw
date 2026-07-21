@@ -80,43 +80,50 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
-import { dockGeo, dockState } from '@/composables/brandDock'
+import { dockGeo, flyP, flyEase } from '@/composables/brandDock'
+
+gsap.registerPlugin(ScrollTrigger)
 
 /* ============================================================
- * 品牌字真身飞入 tab 栏 —— 与开屏 preloader→Hero 同一技法:
- * 越过滚动阈值时,把同一个 h1 pin 成 fixed,一次性 WAAPI 飞行
- * (left/top/fontSize,780ms SMOOTH),落地提交终态;回滚到顶反向。
- * 反向收回与飞行交叠:3/4/7/8 收没 + 数字滑回先行 200ms,
- * 飞行随即启动,收回(0.5s)在飞行(0.78s)途中完成,全程无停顿。
- * 落位后:daum 留在 tab 栏最左不动(SVG 真身),SVG 数字淡出,
- * PagePager 的同字体 DOM 数字原位淡入并左→右展开 3/4/7/8。
+ * 品牌字真身飞入 tab 栏 —— GSAP ScrollTrigger pin + scrub
+ * (与旧版项目展示栏同一库同一技法):
+ * hero 被 pin 在视口顶,滚动行程(RANGE_VH·vh)即动画进度——
+ * p 0→0.7 品牌字整体 transform 缩小平移到左上停靠位;
+ * p 0.75→1 同一个 SVG 内的 5 条数字路径平移摊开(左→右微交错),
+ * 空槽由 PagePager 的 3/4/7/8 新数字补入——自始至终就这一个元素,
+ * 无交接、无替身、无重影。
+ * 进度可正放可倒放,滚多少走多少。滚过终点 onLeave 时 h1 提交为
+ * fixed 钉住(视觉零跳变),回滚 onEnterBack 恢复 scrub 接管。
+ * 数字展开由 flyP(=st.progress)驱动 PagePager。
  * ============================================================ */
 const TARGET_FS = 40 /* 停靠字号 px:svg height=1em,故=停靠高度 */
 const TARGET_TOP = 10
 const SLOT_GAP = 12 /* 宽松态每个数字槽的加宽量 px */
 const LEFT_MARGIN = 16 /* daum 贴视口左边缘的留白 */
-const FLIGHT_MS = 780
-const COLLAPSE_LEAD_MS = 200 /* 收回先行量(与飞行交叠) */
-const SMOOTH = 'cubic-bezier(0.45, 0.05, 0.25, 1)'
-const FLY_DOWN_Y = 80
-const FLY_BACK_Y = 40
+const RANGE_VH = 0.8 /* pin 行程(视口高倍数)= p 0→1 */
+const SLOT_OF = [0, 1, 4, 5, 8] /* 1/2/5/6/9 在 9 槽中的槽位 */
+const VB_W = 5295.5 /* BRAND_VIEWBOX 宽,px→viewBox 单位换算用 */
 
 const slotRef = ref(null)
 const titleRef = ref(null)
 const pathRefs = []
 const scrollYVal = ref(0)
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-let nat = null /* 自然态几何 {fs,left,docTop,w,digitCx[5]} */
-let flying = false
+let nat = null /* 自然态几何 {fs,left,docTop,svgH,digitCx[5]} */
+let spreadDeltas = null /* 各数字 path 摊开位移(viewBox 单位),computeDock 算 */
+let tl = null
+let st = null
+let committed = false /* onLeave 后 h1 已提交 fixed 钉住 */
 
-/* 自然态测量(仅 state=hero 时可信):一次测量,停靠几何纯按比例换算 */
+/* 自然态测量(hero 未被 pin/无 transform 时):一次测量,停靠几何纯按比例换算 */
 function measure() {
   const el = titleRef.value
-  if (!el || dockState.value !== 'hero') return
+  if (!el || committed) return
   const svg = el.querySelector('.hero-brand-svg')
   const r = svg.getBoundingClientRect()
   const digitEls = [4, 5, 6, 7, 8].map((i) => pathRefs[i]).filter(Boolean)
@@ -126,6 +133,7 @@ function measure() {
     left: r.left,
     docTop: r.top + window.scrollY,
     w: r.width,
+    svgH: r.height,
     digitCx: digitEls.map((d) => {
       const b = d.getBoundingClientRect()
       return b.left + b.width / 2 - r.left
@@ -136,15 +144,12 @@ function measure() {
 }
 
 /* 停靠几何 = 自然几何 × (TARGET_FS/fs):
-   daum 在左(spacer=数字 1 槽位左缘),右接 9 个等步进数字槽;
-   胶囊左缘对齐视口 LEFT_MARGIN,散开时向右生长,daum 纹丝不动 */
+   daum 在左(spacer=数字 1 槽位左缘),右接 9 个等步进数字槽 */
 function computeDock() {
   if (!nat) return
   const rto = TARGET_FS / nat.fs
   const a = (nat.digitCx[1] - nat.digitCx[0]) * rto
   const spacer = (nat.digitCx[0] - (nat.digitCx[1] - nat.digitCx[0]) / 2) * rto
-  const wCompact = spacer + 5 * a + 8
-  const wFull = spacer + 9 * (a + SLOT_GAP) + 8
   Object.assign(dockGeo, {
     ready: true,
     left: LEFT_MARGIN + 4,
@@ -152,108 +157,110 @@ function computeDock() {
     w: nat.w * rto,
     h: TARGET_FS,
     advance: a,
-    slotLoose: a + SLOT_GAP,
+    gap: SLOT_GAP,
     spacer,
-    wCompact,
-    wFull,
     digitH: nat.digitH * rto,
   })
+  /* 每个数字 path 从紧凑位到摊开槽位的位移(viewBox 单位) */
+  const slotW = a + SLOT_GAP
+  spreadDeltas = SLOT_OF.map(
+    (s, j) =>
+      (spacer + s * slotW + slotW / 2 - nat.digitCx[j] * rto) * (VB_W / (nat.w * rto)),
+  )
 }
 
-/* 停靠态/首屏态的样式由 watcher 在状态稳定后应用;飞行中(flying)
-   不干预,避免 Vue :style 绑定覆盖 WAAPI 关键帧。后台切回时
-   visibilitychange 也会触发一次补刷。 */
-function applyDockStyle() {
+/* pin 终点(onLeave):h1 提交为 fixed 钉在停靠位,与 timeline 末帧同位零跳变。
+   必须提升到 body:被 pin 的 #hero 祖先可能残留 transform/clip 等形成
+   包含块,fixed 相对它定位就会跟着滚走——挂到 body 下钉视口才真正钉住 */
+function commitDock() {
+  if (committed || !nat) return
+  committed = true
   const el = titleRef.value
-  if (!el) return
-  if (dockState.value === 'docked') {
-    el.style.position = 'fixed'
-    el.style.left = `${dockGeo.left}px`
-    el.style.top = `${dockGeo.top}px`
-    el.style.fontSize = `${TARGET_FS}px`
-    el.style.margin = '0'
-  } else if (dockState.value === 'hero') {
-    el.style.position = ''
-    el.style.left = ''
-    el.style.top = ''
-    el.style.fontSize = ''
-    el.style.margin = ''
-  }
-}
-watch(dockState, applyDockStyle)
-
-async function fly(toDock) {
-  if (flying || !dockGeo.ready) return
-  flying = true
-  const el = titleRef.value
-  const slot = slotRef.value
-  const svg = el.querySelector('.hero-brand-svg')
-  /* 反向收回先行 200ms(数字滑回 + 3/4/7/8 收没),随即启动飞行,
-     收回(0.5s)在飞行(0.78s)途中完成——全程平滑位移 */
-  if (!toDock && !REDUCED) {
-    dockState.value = 'collapsing'
-    await wait(COLLAPSE_LEAD_MS)
-  }
-  const fromRect = svg.getBoundingClientRect()
-  const fromFs = toDock ? parseFloat(getComputedStyle(el).fontSize) : TARGET_FS
-  const to = toDock
-    ? { left: dockGeo.left, top: TARGET_TOP, fs: TARGET_FS }
-    : { left: nat.left, top: nat.docTop - window.scrollY, fs: nat.fs }
-  dockState.value = 'flying'
-  slot.style.height = `${fromRect.height}px`
+  slotRef.value.style.height = `${nat.svgH}px`
+  gsap.set(el, { clearProps: 'transform' })
+  document.body.appendChild(el)
   el.style.position = 'fixed'
   el.style.margin = '0'
-  el.style.left = `${fromRect.left}px`
-  el.style.top = `${fromRect.top}px`
-  el.style.fontSize = `${fromFs}px`
-  if (!toDock) el.classList.remove('is-docked')
+  el.style.left = `${dockGeo.left}px`
+  el.style.top = `${dockGeo.top}px`
+  el.style.fontSize = `${TARGET_FS}px`
+}
 
-  const finish = () => {
-    if (toDock) {
-      /* 落位:SVG 数字淡出(DOM 数字同位淡入由 PagePager .is-docked 驱动),
-         daum 留在原地——它就是 tab 栏最左的标识 */
-      el.classList.add('is-docked')
-      dockState.value = 'docked'
-    } else {
-      el.style.position = ''
-      el.style.margin = ''
-      el.style.left = ''
-      el.style.top = ''
-      el.style.fontSize = ''
-      slot.style.height = ''
-      dockState.value = 'hero'
-    }
-    flying = false
-    onScroll()
-  }
-  if (REDUCED) {
-    finish()
-    return
-  }
-  try {
-    const anim = el.animate(
-      [
-        { left: `${fromRect.left}px`, top: `${fromRect.top}px`, fontSize: `${fromFs}px` },
-        { left: `${to.left}px`, top: `${to.top}px`, fontSize: `${to.fs}px` },
-      ],
-      { duration: FLIGHT_MS, easing: SMOOTH, fill: 'forwards' },
-    )
-    await anim.finished.catch(() => {})
-    anim.cancel()
-  } catch (e) {}
-  finish()
+  /* 回滚进触发区(onEnterBack):撤掉 fixed,按当前 progress 摆回 scrub 姿态,
+   之后由 scrub 接管——无一帧跳变。移动段只占 p 0→0.7,先归一化 */
+function uncommitDock() {
+  if (!committed || !nat) return
+  committed = false
+  const el = titleRef.value
+  slotRef.value.appendChild(el) /* 放回 slot,恢复 scrub 接管 */
+  el.style.position = ''
+  el.style.margin = ''
+  el.style.left = ''
+  el.style.top = ''
+  el.style.fontSize = ''
+  slotRef.value.style.height = ''
+  const pm = Math.min(1, (st ? st.progress : 0) / 0.7)
+  el.style.transformOrigin = 'top left'
+  el.style.transform = `translate(${(dockGeo.left - nat.left) * pm}px, ${(TARGET_TOP - nat.docTop) * pm}px) scale(${1 + (TARGET_FS / nat.fs - 1) * pm})`
+}
+
+function build() {
+  if (!nat || !dockGeo.ready || tl || REDUCED) return
+  const el = titleRef.value
+  tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: '#hero',
+      start: 'top top',
+      end: () => `+=${window.innerHeight * RANGE_VH}`,
+      scrub: true,
+      pin: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        const p = self.progress
+        flyP.value = p
+        /* 展开单一驱动:p 0.75→1 经 smoothstep 缓动后广播——
+           SVG 数字位置、PagePager 槽宽/新数字全用这一条曲线,
+           任意进度下每个数字都严丝合缝落在自己槽位,不叠字 */
+        const t = Math.min(1, Math.max(0, (p - 0.75) / 0.25))
+        const e = t * t * (3 - 2 * t)
+        flyEase.value = e
+        if (spreadDeltas) {
+          for (let j = 0; j < 5; j++) {
+            gsap.set(pathRefs[4 + j], { x: spreadDeltas[j] * e })
+          }
+        }
+      },
+      onLeave: commitDock,
+      onEnterBack: uncommitDock,
+    },
+  })
+  tl.to(
+    el,
+    {
+      x: () => dockGeo.left - nat.left,
+      y: () => TARGET_TOP - nat.docTop,
+      scale: () => TARGET_FS / nat.fs,
+      transformOrigin: 'top left',
+      ease: 'none',
+      duration: 0.7,
+    },
+    0,
+  )
+  /* 时间轴补满到时长 1:移动段 0→0.7 到位后静止,
+     展开段 0.75→1 由 onUpdate 经 flyEase 手工驱动(无补间) */
+  tl.set({}, {}, 1)
+  st = tl.scrollTrigger
 }
 
 function onScroll() {
   scrollYVal.value = window.scrollY
-  if (flying) return
-  if (dockState.value === 'hero' && window.scrollY > FLY_DOWN_Y) fly(true)
-  else if (dockState.value === 'docked' && window.scrollY < FLY_BACK_Y) fly(false)
 }
 
 function onResize() {
-  if (dockState.value === 'hero') {
+  if (!committed) {
     measure()
+    if (st) ScrollTrigger.refresh()
   } else {
     computeDock()
     const el = titleRef.value
@@ -269,16 +276,20 @@ const socialStyle = computed(() => {
 })
 
 onMounted(() => {
-  requestAnimationFrame(measure)
+  requestAnimationFrame(() => {
+    measure()
+    build()
+  })
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('resize', onResize)
-  document.addEventListener('visibilitychange', onVisibility)
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure)
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      measure()
+      if (st) ScrollTrigger.refresh()
+      else build()
+    })
+  }
 })
-
-function onVisibility() {
-  if (!document.hidden) applyDockStyle()
-}
 
 const LEGACY_HREF = './legacy/?from=new'
 const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -323,7 +334,10 @@ onBeforeUnmount(() => {
   document.documentElement.style.overflow = ''
   window.removeEventListener('scroll', onScroll)
   window.removeEventListener('resize', onResize)
-  document.removeEventListener('visibilitychange', onVisibility)
+  if (st) st.kill()
+  if (tl) tl.kill()
+  st = null
+  tl = null
 })
 </script>
 
@@ -334,6 +348,17 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   padding-top: clamp(80px, 14vw, 140px);
+  /* pin 期间 GSAP 给本 section 加 transform 形成层叠上下文,
+     h1 的 z-60 出不去,pager(z-50)的新数字会压在 SVG 数字上面画
+     → 整个 section 提层,SVG 真身始终盖住滑入的新数字。
+     pointer-events 放空,不挡主题切换等下层交互 */
+  position: relative;
+  z-index: 55;
+  pointer-events: none;
+}
+/* 社交行恢复可点(淡出时 socialStyle 会再关掉) */
+.hero-social {
+  pointer-events: auto;
 }
 .hero-inner {
   display: flex;
@@ -369,11 +394,6 @@ onBeforeUnmount(() => {
 .hero-char-path {
   fill: url(#heroBrandGrad);
   transition: opacity 0.2s var(--ease);
-}
-/* 停靠后 SVG 数字淡出:PagePager 的同字体 DOM 数字同位淡入接替,
-   daum 保持 SVG 真身不动 */
-.hero-title.is-docked .hero-char-path.is-digit {
-  opacity: 0;
 }
 /* 交接前占位不可见;落地后立即显示(无淡入抢戏--飞行克隆已盖住同位) */
 .hero-title.handoff-pending .hero-brand-svg {
