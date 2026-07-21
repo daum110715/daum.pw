@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -107,7 +107,7 @@ const TARGET_FS = 40 /* 停靠字号 px:svg height=1em,故=停靠高度 */
 const TARGET_TOP = 10
 const SLOT_GAP = 12 /* 宽松态每个数字槽的加宽量 px */
 const LEFT_MARGIN = 28 /* daum 贴视口左边缘的留白 */
-const RANGE_VH = 0.4 /* pin 行程(视口高倍数)= p 0→1 */
+const RANGE_VH = 0.4 /* pin 行程(视口高倍数)= p 0→1;品牌字按此标定,勿擅自加长 */
 const SLOT_OF = [0, 1, 4, 5, 8] /* 1/2/5/6/9 在 9 槽中的槽位 */
 const VB_W = 5295.5 /* BRAND_VIEWBOX 宽,px→viewBox 单位换算用 */
 
@@ -187,13 +187,12 @@ function applyFlyPose() {
    追赶永不"过期";目标静止则自然收敛,原地交还 scrub。
    (旧实现:0.25s 固定终点补间 + 滚动即杀——snap 延迟小于收回时长时
    必然在收回途中挪动进度;杀补间瞬间姿态从 p=1 跳变到当前
-   进度,即快速收回时瞬移的根因)
-   追赶系数 0.88:比 0.82 更软,吸附/惯性拖动时少机械感 */
+   进度,即快速收回时瞬移的根因) */
 function flyChase(_time, deltaTime) {
   const target = st ? st.progress : 0
-  const k = 1 - Math.pow(0.88, (deltaTime || 16.667) / 16.667) /* 帧率无关追赶系数 */
+  const k = 1 - Math.pow(0.82, (deltaTime || 16.667) / 16.667) /* 帧率无关追赶系数(品牌标定) */
   flyPose.p += (target - flyPose.p) * k
-  if (Math.abs(target - flyPose.p) < 0.0015) flyPose.p = target
+  if (Math.abs(target - flyPose.p) < 0.002) flyPose.p = target
   applyFlyPose()
   if (flyPose.p === target) endFlyChase() /* 收敛:姿态=scrub 渲染值,原地交还 */
 }
@@ -221,10 +220,11 @@ function flyBack() {
   applyFlyPose()
   flyChasing = true
   gsap.ticker.add(flyChase)
-  /* 社交胶囊同步回家:回到 hero 原位,同法追赶交还 scrub */
+  /* 社交胶囊同步回家:解除烘焙 → 回 stage → p=1 姿态 → 追赶到当前 progress */
   if (socialRowEl && socialStageEl && socNat) {
     endSocChase()
     const s = socialRowEl
+    unbakeSocDock()
     socialStageEl.appendChild(s)
     s.style.position = ''
     s.style.margin = ''
@@ -233,34 +233,130 @@ function flyBack() {
     s.style.top = ''
     s.style.zIndex = ''
     socPose.p = 1
-    applySocPose()
+    applySocState(1)
     socChasing = true
     gsap.ticker.add(socChase)
   }
 }
 
 /* ============================================================
- * 社交胶囊对接 tab 栏 —— 与品牌字同法:自然位测量、scrub 飞行、
- * commitDock 提交 fixed、flyBack 追赶回家;合并态原样停靠,不参与展开
+ * 社交胶囊对接 tab 栏 —— 与品牌字同 pin/progress,但不走 timeline gap:
+ * 合并用子项 translateX(合成层),飞行用 row translate3d;
+ * applySocState(p) 单一驱动(scrub onUpdate / chase 共用),边合边飞。
+ * commitDock 烘成 gap:0+fixed;flyBack 还原 gap 后从 p=1 追赶回家。
+ *
+ * 背景:飞行进度 p 到一半(SOCIAL_BG_FADE_END)即消散完毕,回程后半再凝聚;
+ * 不再绑品牌 flyEase 展开。停靠高与主题开关齐平(32px / top 18)。
  * ============================================================ */
-const SOCIAL_TOP = 6 /* 与 pager 胶囊同顶线(dockGeo.top 10 - 4) */
 const SOCIAL_RIGHT = 98 /* 主题开关(right 18 + 宽 64)+ 16 间距 */
+const SOCIAL_GAP = 12 /* 与 .social-row gap 一致;合并时用 x 收拢,不改 gap 触布局 */
+const SOCIAL_MERGE_END = 0.55 /* p 到此合并完成;飞行全程 0→1 与之重叠 */
+const SOCIAL_BG_FADE_END = 0.5 /* 飞行进度到此背景消散完 */
+const SOCIAL_NAT_H = 48 /* hero 自然态按钮高 */
+const SOCIAL_DOCK_H = 32 /* 与 ThemeToggle .track 同高 */
+const SOCIAL_DOCK_TOP = 18 /* 与 .theme-floating top 同顶(窄屏 14 见 socDockTop) */
+function socDockH() {
+  return SOCIAL_DOCK_H
+}
+function socDockTop() {
+  return typeof window !== 'undefined' && window.innerWidth <= 640 ? 14 : SOCIAL_DOCK_TOP
+}
 
 let socialStageEl = null
 let socialRowEl = null
 let socialItemEls = []
-let socNat = null /* 自然态几何 {left,docTop,mergedW} */
+let socNat = null /* 自然态 {left,docTop,natW,mergedW,dockMergedW} */
+let socRadius = 18 /* px,自 --radius 读 */
 const socPose = { p: 1 }
 let socChasing = false
+let socBaked = false /* commit 后已烘成 gap:0,勿再 applySocState */
 
-function socDockLeft() {
-  return window.innerWidth - SOCIAL_RIGHT - socNat.mergedW
+/** 停靠时胶囊右缘(主题开关左) */
+function socDockRight() {
+  return window.innerWidth - SOCIAL_RIGHT
 }
 
-function applySocPose() {
-  if (!socNat || !socialRowEl) return
-  const p = socPose.p
-  socialRowEl.style.transform = `translate(${(socDockLeft() - socNat.left) * p}px, ${(SOCIAL_TOP - socNat.docTop) * p}px)`
+function socDockLeft() {
+  const w = socNat.dockMergedW || socNat.mergedW
+  return socDockRight() - w
+}
+
+/** 合并量 0-1:p 在 [0, SOCIAL_MERGE_END] 内 power2.out 收拢 */
+function mergeAmount(p) {
+  const t = Math.min(1, Math.max(0, p / SOCIAL_MERGE_END))
+  return 1 - (1 - t) * (1 - t)
+}
+
+/** 背景随飞行进度消散:p=0 实底 → p≥SOCIAL_BG_FADE_END 全消;回程反向凝聚 */
+function applySocBg(p) {
+  if (!socialItemEls.length) return
+  const t = Math.min(1, Math.max(0, p / SOCIAL_BG_FADE_END))
+  const bgO = (1 - t).toFixed(3)
+  const blur = `${(t * 10).toFixed(2)}px`
+  const scale = (1 + t * 0.06).toFixed(4)
+  const applyVars = (el) => {
+    el.style.setProperty('--soc-bg-o', bgO)
+    el.style.setProperty('--soc-bg-blur', blur)
+    el.style.setProperty('--soc-bg-scale', scale)
+    el.style.setProperty('--soc-fg-dim', '0')
+  }
+  if (socialRowEl) applyVars(socialRowEl)
+  for (const el of socialItemEls) applyVars(el)
+}
+
+/** 飞行进度上的高度:自然 48 → 与主题开关齐平的 32 */
+function applySocSize(p) {
+  if (!socialItemEls.length) return
+  const h1 = SOCIAL_DOCK_H
+  const h = SOCIAL_NAT_H + (h1 - SOCIAL_NAT_H) * p
+  const s = h / SOCIAL_NAT_H
+  const icon = (22 * s).toFixed(1)
+  for (const el of socialItemEls) {
+    el.style.height = `${h.toFixed(2)}px`
+    if (el.classList.contains('social-icon')) {
+      el.style.width = `${h.toFixed(2)}px`
+      el.style.setProperty('--soc-icon', `${icon}px`)
+    } else {
+      el.style.paddingLeft = `${(18 * s).toFixed(2)}px`
+      el.style.paddingRight = `${(18 * s).toFixed(2)}px`
+      el.style.fontSize = `${(15 * s).toFixed(2)}px`
+      el.style.setProperty('--soc-icon', `${(20 * s).toFixed(1)}px`)
+    }
+  }
+  if (socialRowEl) socialRowEl.style.height = `${h.toFixed(2)}px`
+}
+
+/**
+ * 按进度写合并 + 飞行。
+ * 位移用「右缘锚定」:自然右缘 → 主题开关左缘 线性插值,再反推 left=right-packW。
+ * 避免用最终 dock 宽算 left 导致缩宽/合并时右缘折线、最后一段像跳一下。
+ * 进度与 ST 1:1(飞回 chase 除外),commit 前贴 p=1 再 bake,末段零跳变。
+ */
+function applySocState(p) {
+  if (!socNat || !socialRowEl || socBaked) return
+  const m = mergeAmount(p)
+  const n = socialItemEls.length
+  const r = socRadius
+  applySocSize(p)
+  let sumW = 0
+  for (let i = 0; i < n; i++) {
+    const el = socialItemEls[i]
+    sumW += el.offsetWidth
+    el.style.transform = `translate3d(${(-i * SOCIAL_GAP * m).toFixed(2)}px,0,0)`
+    el.style.borderRadius = `${r}px`
+  }
+  /* 视觉胶囊宽 = 当前钮宽之和 + 残余 gap */
+  const packW = sumW + SOCIAL_GAP * Math.max(0, n - 1) * (1 - m)
+  socialRowEl.style.setProperty('--soc-merge', m.toFixed(4))
+  socialRowEl.style.setProperty('--soc-pack-w', `${packW.toFixed(2)}px`)
+  applySocBg(p)
+  const natRight = socNat.left + (socNat.natW || packW)
+  const right = natRight + (socDockRight() - natRight) * p
+  const left = right - packW
+  const dx = left - socNat.left
+  const dy = (socDockTop() - socNat.docTop) * p
+  socialRowEl.style.transform = `translate3d(${dx.toFixed(2)}px,${dy.toFixed(2)}px,0)`
+  socPose.p = p
 }
 
 function socChase(_time, deltaTime) {
@@ -268,14 +364,66 @@ function socChase(_time, deltaTime) {
   const k = 1 - Math.pow(0.88, (deltaTime || 16.667) / 16.667)
   socPose.p += (target - socPose.p) * k
   if (Math.abs(target - socPose.p) < 0.0015) socPose.p = target
-  applySocPose()
-  if (socPose.p === target) endSocChase() /* 收敛:姿态=scrub 渲染值,原地交还 */
+  applySocState(socPose.p)
+  if (socPose.p === target) endSocChase()
 }
 
 function endSocChase() {
   if (!socChasing) return
   socChasing = false
   gsap.ticker.remove(socChase)
+}
+
+/**
+ * 停靠烘焙:先 applySocState(1) 贴齐末帧,再清 transform 改 fixed。
+ * 用 left(与 applySocState 右缘公式同值)而非只设 right,避免末段切换坐标系跳一下。
+ */
+function bakeSocDock() {
+  if (!socialRowEl || !socNat) return
+  const s = socialRowEl
+  const r = socRadius
+  const h = socDockH()
+  const scale = h / SOCIAL_NAT_H
+  const dockW = socNat.dockMergedW || socNat.mergedW
+  const dockLeft = socDockRight() - dockW
+  /* 先画到 p=1 视觉位,再钉 fixed——与品牌 clearProps 同序,末段连贯 */
+  socBaked = false
+  applySocState(1)
+  socialItemEls.forEach((el) => {
+    el.style.transform = ''
+    el.style.height = `${h}px`
+    el.style.borderRadius = `${r}px`
+    if (el.classList.contains('social-icon')) {
+      el.style.width = `${h}px`
+      el.style.setProperty('--soc-icon', `${(22 * scale).toFixed(1)}px`)
+    } else {
+      el.style.paddingLeft = `${(18 * scale).toFixed(2)}px`
+      el.style.paddingRight = `${(18 * scale).toFixed(2)}px`
+      el.style.fontSize = `${(15 * scale).toFixed(2)}px`
+      el.style.setProperty('--soc-icon', `${(20 * scale).toFixed(1)}px`)
+    }
+  })
+  s.style.transform = ''
+  s.style.gap = '0'
+  s.style.height = `${h}px`
+  s.style.setProperty('--soc-merge', '1')
+  s.style.setProperty('--soc-pack-w', `${dockW}px`)
+  socBaked = true
+  applySocBg(1)
+  return { dockLeft, dockTop: socDockTop() }
+}
+
+/** 飞回前解除烘焙,恢复 CSS gap,姿态由 applySocState(1) 接 */
+function unbakeSocDock() {
+  if (!socialRowEl) return
+  socialRowEl.style.gap = ''
+  socialRowEl.style.height = ''
+  socialRowEl.style.left = ''
+  socialRowEl.style.right = ''
+  socialRowEl.style.top = ''
+  socialRowEl.style.removeProperty('--soc-merge')
+  socialRowEl.style.removeProperty('--soc-pack-w')
+  socBaked = false
 }
 
 /* 自然态测量(hero 未被 pin/无 transform 时):一次测量,停靠几何纯按比例换算 */
@@ -298,13 +446,25 @@ function measure() {
     }),
     digitH: digitEls[0].getBoundingClientRect().height,
   }
-  if (socialRowEl && socialItemEls.length) {
+  if (socialRowEl && socialItemEls.length && !socBaked) {
     const r = socialRowEl.getBoundingClientRect()
+    const mergedW = socialItemEls.reduce((sum, it) => sum + it.offsetWidth, 0)
+    /* 停靠宽:缩到主题开关同高后的等比(图标方、旧版跟高缩放) */
+    const sc = SOCIAL_DOCK_H / SOCIAL_NAT_H
+    const dockMergedW = socialItemEls.reduce((sum, it) => {
+      if (it.classList.contains('social-icon')) return sum + SOCIAL_DOCK_H
+      return sum + it.offsetWidth * sc
+    }, 0)
     socNat = {
       left: r.left,
       docTop: r.top + window.scrollY,
-      mergedW: socialItemEls.reduce((sum, it) => sum + it.offsetWidth, 0),
+      natW: r.width /* 含 gap 的自然总宽,右缘锚定用 */,
+      mergedW,
+      dockMergedW,
     }
+    const rad = getComputedStyle(document.documentElement).getPropertyValue('--radius').trim()
+    const parsed = parseFloat(rad)
+    if (!Number.isNaN(parsed)) socRadius = parsed
   }
   computeDock()
 }
@@ -351,17 +511,17 @@ function commitDock() {
   el.style.left = `${dockGeo.left}px`
   el.style.top = `${dockGeo.top}px`
   el.style.fontSize = `${TARGET_FS}px`
-  /* 社交胶囊同法提交:钉进 tab 栏右侧空白(pager 同顶线,主题开关左) */
+  /* 社交胶囊:贴 p=1 → bake → fixed(left 与末帧同值),末段不跳 */
   if (socialRowEl && socNat) {
     endSocChase()
+    const { dockLeft, dockTop } = bakeSocDock()
     const s = socialRowEl
-    gsap.set(s, { clearProps: 'transform' })
     document.body.appendChild(s)
     s.style.position = 'fixed'
     s.style.margin = '0'
-    s.style.left = 'auto'
-    s.style.right = `${SOCIAL_RIGHT}px`
-    s.style.top = `${SOCIAL_TOP}px`
+    s.style.right = 'auto'
+    s.style.left = `${dockLeft}px`
+    s.style.top = `${dockTop}px`
     s.style.zIndex = '60'
   }
 }
@@ -374,20 +534,19 @@ function build() {
       trigger: '#hero',
       start: 'top top',
       end: () => `+=${window.innerHeight * RANGE_VH}`,
+      /* 必须 true:品牌字 timeline/flyChase/commit 均按 1:1 scrub 标定。
+         社交同样 1:1 跟 progress(右缘锚定),避免滞后在 commit 时被钉飞 */
       scrub: true,
       pin: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
-      /* 自动吸附:滚动停稳后若品牌字/社交胶囊悬在飞行半途,吸到就近端点
-         (自然位 p=0 / 停靠位 p=1),消除"滚到一半"的尴尬态;
-         时长拉长 + power3 缓入缓出,吸附本身更丝滑;
-         吸附过程的连续滚动由 onUpdate 直接接管飞回姿态,与 snap 无冲突 */
+      /* 自动吸附:停稳后吸到就近端点(品牌+社交共用 scroll 端点) */
       snap: {
         /* 主题换肤期间 themeScrollLock=true:原样返回当前进度,禁止吸到端点 */
         snapTo: (v) => (themeScrollLock.value ? v : v < 0.5 ? 0 : 1),
-        duration: { min: 0.4, max: 0.95 },
-        delay: 0.05,
-        ease: 'power3.inOut',
+        duration: { min: 0.15, max: 0.45 },
+        delay: 0.12,
+        ease: 'power2.inOut',
       },
       onUpdate: (self) => {
         flyP.value = self.progress
@@ -398,8 +557,7 @@ function build() {
           return
         }
         /* 飞回追赶中进度冲到 1(用户/snap 直冲停靠位):立即贴齐,
-           commitDock 随之钉住零跳变;其余情况追赶每帧自读 st.progress,
-           无需干预——scrub 写入会被 ticker 上的追赶姿态覆盖,同公式同序 */
+           commitDock 随之钉住零跳变;其余情况追赶每帧自读 st.progress */
         if (flyChasing && self.progress >= 1) {
           endFlyChase()
           flyPose.p = 1
@@ -407,9 +565,10 @@ function build() {
         }
         if (socChasing && self.progress >= 1) {
           endSocChase()
-          socPose.p = 1
-          applySocPose()
+          applySocState(1)
         }
+        /* 社交 1:1 跟 progress(飞回 chase 时由 ticker 覆盖) */
+        if (!socChasing && !socBaked) applySocState(self.progress)
       },
       onLeave: () => {
         commitDock()
@@ -427,6 +586,7 @@ function build() {
       onRefresh: (self) => {
         if (!committed) {
           flyP.value = self.progress
+          if (!socChasing && !socBaked) applySocState(self.progress)
           return
         }
         const el = titleRef.value
@@ -437,6 +597,7 @@ function build() {
       },
     },
   })
+  /* 品牌字 timeline scrub 1:1;社交 onUpdate → applySocState 右缘锚定 */
   tl.to(
     el,
     {
@@ -449,67 +610,8 @@ function build() {
     },
     0,
   )
-  /* 社交胶囊对接 tab 栏:图标原地合并成连续胶囊(0–0.34,缓入缓出),
-     随后整颗飞往栏内右侧停靠位(0.28–1,与合并段轻微重叠、与品牌字同抵),
-     到位由 commitDock 提交 fixed,合并态原样停靠;收回时从栏位起飞追赶回家。
-     gap/圆角可用 ease;位移必须 ease:none,与 applySocPose 线性公式交接零跳变 */
-  if (socialStageEl && socialRowEl && socNat) {
-    const socialRow = socialRowEl
-    const merge = { duration: 0.34, ease: 'power2.inOut' }
-    tl.to(
-      socialRow,
-      {
-        gap: 0,
-        ...merge,
-      },
-      0,
-    )
-    /* 合并时同步把中间子元素圆角收平、首尾保留外侧圆角,形成一个连续大按钮 */
-    const radiusVal =
-      getComputedStyle(document.documentElement).getPropertyValue('--radius').trim() || '18px'
-    const firstItem = socialItemEls[0]
-    const lastItem = socialItemEls[socialItemEls.length - 1]
-    const middleItems = socialItemEls.slice(1, -1)
-    if (middleItems.length) {
-      tl.to(
-        middleItems,
-        {
-          borderRadius: 0,
-          ...merge,
-        },
-        0,
-      )
-    }
-    tl.to(
-      firstItem,
-      {
-        borderRadius: `${radiusVal} 0 0 ${radiusVal}`,
-        ...merge,
-      },
-      0,
-    )
-    tl.to(
-      lastItem,
-      {
-        borderRadius: `0 ${radiusVal} ${radiusVal} 0`,
-        ...merge,
-      },
-      0,
-    )
-    /* 飞行:整颗胶囊对接 tab 栏右侧(主题开关左),与品牌字同抵;
-       略早于合并结束起飞,重叠段像「边合边走」,吸附更连贯 */
-    tl.to(
-      socialRow,
-      {
-        x: () => (socNat ? socDockLeft() - socNat.left : 0),
-        y: () => (socNat ? SOCIAL_TOP - socNat.docTop : 0),
-        ease: 'none',
-        duration: 0.72,
-      },
-      0.28,
-    )
-  }
   st = tl.scrollTrigger
+  if (socNat) applySocState(st.progress)
 }
 
 function onResize() {
@@ -527,6 +629,7 @@ onMounted(() => {
   socialStageEl = document.querySelector('.social-stage')
   socialRowEl = document.querySelector('.social-row')
   socialItemEls = socialRowEl ? Array.from(socialRowEl.children) : []
+  applySocBg(0)
   requestAnimationFrame(() => {
     measure()
     build()
@@ -684,10 +787,63 @@ onBeforeUnmount(() => {
   width: fit-content;
 }
 .social-row {
+  --soc-merge: 0;
+  --soc-pack-w: 100%;
+  --soc-bg-o: 1;
+  --soc-bg-blur: 0px;
+  --soc-bg-scale: 1;
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 12px; /* 与 SOCIAL_GAP 同步;合并用子项 translateX,不动画此值 */
   position: relative;
   z-index: 1;
+  will-change: transform;
+}
+/* 合并后唯一底:整条圆角胶囊,无接缝、不切碎边框 */
+.social-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: var(--soc-pack-w);
+  border-radius: var(--radius-full);
+  background: var(--bg-2);
+  opacity: calc(var(--soc-bg-o) * var(--soc-merge));
+  filter: blur(var(--soc-bg-blur));
+  transform: scale(var(--soc-bg-scale));
+  transform-origin: center left;
+  z-index: 0;
+  pointer-events: none;
+}
+/* 子项底:自然态各自一块;合并时淡出,交给 row 胶囊 */
+.social-icon,
+.legacy-link {
+  --soc-bg-o: 1;
+  --soc-bg-blur: 0px;
+  --soc-bg-scale: 1;
+  --soc-fg-dim: 0;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--text) calc((1 - var(--soc-fg-dim)) * 100%), var(--text-dim));
+}
+.social-icon::before,
+.legacy-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--bg-2);
+  /* 合并进度 ↑ → 子项底 ↓,避免五块圆角硬拼 */
+  opacity: calc(var(--soc-bg-o) * (1 - var(--soc-merge)));
+  filter: blur(var(--soc-bg-blur));
+  transform: scale(var(--soc-bg-scale));
+  transform-origin: center;
+  z-index: -1;
+  pointer-events: none;
+  transition: background var(--dur) var(--ease);
 }
 .social-icon {
   display: inline-flex;
@@ -696,21 +852,22 @@ onBeforeUnmount(() => {
   width: 48px;
   height: 48px;
   border-radius: var(--radius);
-  background: var(--bg-2);
-  color: var(--text);
   overflow: visible;
-  transition:
-    color var(--dur) var(--ease),
-    background var(--dur) var(--ease);
+  will-change: transform;
+  transition: color var(--dur) var(--ease);
 }
 .social-icon:hover {
   color: var(--accent);
+}
+.social-icon:hover::before {
   background: var(--accent-soft);
 }
 .social-icon :deep(svg) {
-  width: 22px;
-  height: 22px;
+  width: var(--soc-icon, 22px);
+  height: var(--soc-icon, 22px);
   overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 /* 旧版入口:宽框 + 图标 + 文字,与 social-icon 同色系但形态区分 */
 .legacy-link {
@@ -720,24 +877,29 @@ onBeforeUnmount(() => {
   height: 48px;
   padding: 0 18px;
   border-radius: var(--radius);
-  background: var(--bg-2);
-  color: var(--text);
   font-size: 15px;
   font-weight: 600;
   font-family: var(--font-display);
   white-space: nowrap;
-  transition:
-    color var(--dur) var(--ease),
-    background var(--dur) var(--ease);
+  will-change: transform;
+  transition: color var(--dur) var(--ease);
 }
 .legacy-link:hover {
   color: var(--accent);
+}
+.legacy-link:hover::before {
   background: var(--accent-soft);
 }
 .legacy-link :deep(svg) {
-  width: 20px;
-  height: 20px;
+  width: var(--soc-icon, 20px);
+  height: var(--soc-icon, 20px);
   overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+.legacy-link span {
+  position: relative;
+  z-index: 1;
 }
 
 /* ---------- 旧版转场幕布 ---------- */

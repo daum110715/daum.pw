@@ -3,8 +3,8 @@ import { themeScrollLock } from '@/composables/brandDock'
 
 const STORAGE_KEY = 'daum-theme'
 const TRANSITION_DURATION = 450
-/* 覆盖 snap delay(0.05)+duration max(0.95) 与换肤回流窗口 */
-const SCROLL_LOCK_MS = 1100
+/* 覆盖 snap delay(0.12)+duration max(0.45) 与换肤回流窗口 */
+const SCROLL_LOCK_MS = 600
 
 // 全局共享主题状态(模块单例)
 const theme = ref('light')
