@@ -54,6 +54,24 @@ function toggleWithTransition() {
   styleEl.textContent = bakeCurtainKeyframes(next === 'dark')
   document.head.appendChild(styleEl)
 
+  /* 锁滚 + 藏系统滚动条(见 html.theme-vt-active):快照前后真条不参与帘,
+     避免滚动条与主题帘叠色/双条;overflow:hidden 拦不住 scrollTo/部分滚轮,
+     再用捕获态 wheel/touch + scroll 钳位把 scrollY 钉死 */
+  const root = document.documentElement
+  const lockedY = window.scrollY
+  const pinScroll = () => {
+    if (window.scrollY !== lockedY) window.scrollTo({ top: lockedY, behavior: 'instant' })
+  }
+  const blockScrollInput = (e) => {
+    e.preventDefault()
+    pinScroll()
+  }
+  root.classList.add('theme-vt-active')
+  pinScroll()
+  window.addEventListener('wheel', blockScrollInput, { passive: false, capture: true })
+  window.addEventListener('touchmove', blockScrollInput, { passive: false, capture: true })
+  window.addEventListener('scroll', pinScroll, { passive: true, capture: true })
+
   // 圆点(.thumb-lift 包裹)带独立 view-transition-name(neu.css),不进根
   // 快照:实时浮在帘上,thumb 从点击瞬间起滑;胶囊背景留在根快照随帘
   // 揭示——若整个按钮等帘边扫到才动,浅色模式(帘从左来、按钮在右上)
@@ -64,12 +82,18 @@ function toggleWithTransition() {
     activeVt = null
     curtainCleanup = null
     styleEl.remove()
+    window.removeEventListener('wheel', blockScrollInput, { capture: true })
+    window.removeEventListener('touchmove', blockScrollInput, { capture: true })
+    window.removeEventListener('scroll', pinScroll, { capture: true })
+    root.classList.remove('theme-vt-active')
+    window.scrollTo({ top: lockedY, behavior: 'instant' })
   }
   curtainCleanup = cleanup
   try {
     const vt = document.startViewTransition(() => {
       document.documentElement.setAttribute('data-theme', next)
       set(next)
+      pinScroll()
     })
     activeVt = vt
     vt.finished.then(cleanup).catch(cleanup)

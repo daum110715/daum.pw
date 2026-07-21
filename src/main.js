@@ -255,17 +255,18 @@ function brandInk() {
   )
 }
 
-/** 品牌名渐变(SVG url(#*BrandGrad) 由 CSS stop-color 跟随主题);残留 .brand-ink 仍钉实色 */
+/** 品牌名:CSS --brand-ink 随 data-theme 切换;勿写进 html 内联,否则会钉死开机色盖住主题变量。
+ *  仅清掉残留 .brand-ink 的渐变/实色内联,交还给 var(--brand-ink) */
 function syncInk() {
-  const ink = brandInk()
-  document.documentElement.style.setProperty('--brand-ink', ink)
   document.querySelectorAll('.brand-ink').forEach((el) => {
     el.style.background = 'none'
     el.style.backgroundImage = 'none'
-    el.style.color = ink
-    el.style.webkitTextFillColor = ink
+    el.style.color = ''
+    el.style.webkitTextFillColor = ''
   })
-  return ink
+  /* 若历史会话曾写过 html 内联 --brand-ink,清掉以免钉死 */
+  document.documentElement.style.removeProperty('--brand-ink')
+  return brandInk()
 }
 
 /** 共享收尾:揭示 Hero 标题 + 级联 reveal-after-boot。挂 window 供 index.html 兜底复用。

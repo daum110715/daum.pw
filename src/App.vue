@@ -22,7 +22,8 @@ useReveal()
   position: fixed;
   top: 18px;
   right: 18px;
-  z-index: 50;
+  /* 高于 hero pin(z55)与提交后社交胶囊(z60),避免被 pin-spacer 盖住点不到 */
+  z-index: 70;
 }
 @media (max-width: 640px) {
   .theme-floating {

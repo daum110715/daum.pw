@@ -68,6 +68,11 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 24px;
+  /* 预留滚动条槽:系统条显隐 / 主题 VT 锁滚时不挤动内容与右上 fixed 按钮 */
+  scrollbar-gutter: stable;
+  /* 标准滚动条着色,随 data-theme 变量走;比仅 webkit 伪元素在主题切换后更稳 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--shadow-dark) var(--bg);
 }
 
 body {
@@ -96,7 +101,15 @@ body {
   z-index: 1;
 }
 
-/* 主题切换时全页颜色/背景平滑过渡(不覆盖内容) */
+/* GSAP ScrollTrigger pin 包裹层:默认 pe:auto + 继承/拷贝的 z-index(hero=55)
+   会盖住 fixed 的主题钮(原 z50)/tab 栏,导致主题切换点不到。
+   pe:none 让事件穿透到下层 fixed UI;hero 内社交等可再 pe:auto 恢复可点 */
+.pin-spacer {
+  pointer-events: none;
+}
+
+/* 主题切换回退路径:只过渡颜色相关,绝不碰 transform/opacity——
+   否则 !important 会拖住 GSAP scrub / pin,表现为"一切主题滚动就打架" */
 html.theme-transition,
 html.theme-transition *,
 html.theme-transition *::before,
@@ -108,9 +121,20 @@ html.theme-transition *::after {
     border-color 0.4s var(--ease),
     fill 0.4s var(--ease),
     stroke 0.4s var(--ease),
-    transform 0.4s var(--ease),
-    opacity 0.4s var(--ease),
-    clip-path 0.4s var(--ease) !important;
+    scrollbar-color 0.4s var(--ease) !important;
+}
+
+/* 主题帘形 VT 活动期:锁滚 + 藏真滚动条。
+   根快照不含系统条,避免帘内假页与帘外真条叠色/双条;
+   scrollbar-gutter:stable 保槽位,overflow 切换不横跳。 */
+html.theme-vt-active {
+  overflow: hidden;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+html.theme-vt-active::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* ---------- 主题切换:帘形遮罩横拉(View Transitions API) ----------
@@ -169,7 +193,7 @@ ul {
   list-style: none;
 }
 
-/* scrollbar */
+/* scrollbar(webkit 补强;标准属性见 html 规则) */
 html::-webkit-scrollbar {
   width: 8px;
 }
