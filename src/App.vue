@@ -1,13 +1,17 @@
 <template>
   <ThemeToggle class="theme-floating reveal reveal-after-boot" />
+  <PagePager />
   <main>
     <HeroSection />
+    <PageSection v-for="n in 8" :key="n" :index="n + 1" />
   </main>
 </template>
 
 <script setup>
 import ThemeToggle from './components/ThemeToggle.vue'
 import HeroSection from './components/HeroSection.vue'
+import PageSection from './components/PageSection.vue'
+import PagePager from './components/PagePager.vue'
 import { useReveal } from '@/composables/useReveal'
 
 useReveal()

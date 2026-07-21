@@ -8,10 +8,7 @@
   --font-display: 'Outfit', 'Noto Sans SC', sans-serif;
   --font-body: 'Noto Sans SC', 'Outfit', sans-serif;
 
-  --radius-sm: 12px;
   --radius: 18px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
   --radius-full: 9999px;
 
   --dur: 0.35s;
@@ -19,13 +16,6 @@
 
   --maxw: 1120px;
   --pad: clamp(20px, 5vw, 48px);
-  --section-gap: clamp(64px, 10vw, 120px);
-
-  /* 新拟态阴影距离/模糊(更克制) */
-  --dist: 3px;
-  --blur: 8px;
-  --dist-lg: 5px;
-  --blur-lg: 12px;
 }
 
 /* ---------- Light theme (default) ---------- */
@@ -225,78 +215,6 @@ h4 {
   padding: clamp(56px, 9vw, 96px) 0;
 }
 
-.section-head {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  margin-bottom: clamp(28px, 5vw, 44px);
-}
-.section-head.center {
-  justify-content: center;
-  text-align: center;
-}
-.section-tag {
-  font-family: var(--font-display);
-  font-weight: 800;
-  color: var(--accent-text);
-  font-size: 1.35rem;
-  line-height: 1;
-}
-.section-title {
-  font-size: clamp(1.4rem, 3.6vw, 2rem);
-}
-.section-sub {
-  color: var(--text-dim);
-  margin-top: 10px;
-  max-width: 56ch;
-  font-size: 0.96rem;
-}
-.section-head.center .section-sub {
-  margin-inline: auto;
-}
-
-/* ---------- Surface utilities (currently flat; neumorphism to be re-added later) ---------- */
-.neu {
-  background: var(--bg-2);
-  border-radius: var(--radius);
-  transition:
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-.neu-lg {
-  background: var(--bg-2);
-  border-radius: var(--radius-lg);
-  transition:
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-.neu-inset {
-  background: var(--bg);
-  color: var(--accent-text);
-  border-radius: var(--radius);
-  transition:
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-
-/* nested surfaces fall back to page background for contrast */
-.neu .neu,
-.neu-lg .neu,
-.neu-lg .neu-lg {
-  background: var(--bg);
-}
-.neu .neu-inset,
-.neu-lg .neu-inset {
-  background: var(--bg);
-}
-
-.neu-hover:hover {
-  transform: translateY(-2px);
-}
-.neu-press:active {
-  transform: scale(0.98);
-}
-
 /* ---------- Reveal animation ---------- */
 .reveal {
   opacity: 0;
@@ -316,17 +234,7 @@ h4 {
 }
 
 /* ---------- Helpers ---------- */
-.text-dim {
-  color: var(--text-dim);
-}
-.accent {
-  color: var(--accent-text);
-}
-.mono {
-  font-family: var(--font-display);
-  letter-spacing: 0.02em;
-}
-/* 装饰渐变字(页脚等) */
+/* 装饰渐变字 */
 .grad-text {
   background-image: linear-gradient(135deg, var(--accent-text), var(--accent-2));
   -webkit-background-clip: text;
