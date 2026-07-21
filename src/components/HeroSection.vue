@@ -90,7 +90,7 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
-import { dockGeo, flyP, flyEase } from '@/composables/brandDock'
+import { dockGeo, flyP, flyEase, themeScrollLock } from '@/composables/brandDock'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -185,14 +185,15 @@ function applyFlyPose() {
 /* 收回播完:h1 交还 scrub。自停靠位(p=1,与 fixed 视觉一致)起飞,
    每帧指数追赶 st.progress——目标随滚动(snap/惯性/用户)实时变化,
    追赶永不"过期";目标静止则自然收敛,原地交还 scrub。
-   (旧实现:0.25s 固定终点补间 + 滚动即杀——snap 延迟 0.12s 小于收回
-   0.35s,必然在收回途中挪动进度;杀补间瞬间姿态从 p=1 跳变到当前
-   进度,即快速收回时瞬移的根因) */
+   (旧实现:0.25s 固定终点补间 + 滚动即杀——snap 延迟小于收回时长时
+   必然在收回途中挪动进度;杀补间瞬间姿态从 p=1 跳变到当前
+   进度,即快速收回时瞬移的根因)
+   追赶系数 0.88:比 0.82 更软,吸附/惯性拖动时少机械感 */
 function flyChase(_time, deltaTime) {
   const target = st ? st.progress : 0
-  const k = 1 - Math.pow(0.82, (deltaTime || 16.667) / 16.667) /* 帧率无关追赶系数 */
+  const k = 1 - Math.pow(0.88, (deltaTime || 16.667) / 16.667) /* 帧率无关追赶系数 */
   flyPose.p += (target - flyPose.p) * k
-  if (Math.abs(target - flyPose.p) < 0.002) flyPose.p = target
+  if (Math.abs(target - flyPose.p) < 0.0015) flyPose.p = target
   applyFlyPose()
   if (flyPose.p === target) endFlyChase() /* 收敛:姿态=scrub 渲染值,原地交还 */
 }
@@ -264,9 +265,9 @@ function applySocPose() {
 
 function socChase(_time, deltaTime) {
   const target = st ? st.progress : 0
-  const k = 1 - Math.pow(0.82, (deltaTime || 16.667) / 16.667)
+  const k = 1 - Math.pow(0.88, (deltaTime || 16.667) / 16.667)
   socPose.p += (target - socPose.p) * k
-  if (Math.abs(target - socPose.p) < 0.002) socPose.p = target
+  if (Math.abs(target - socPose.p) < 0.0015) socPose.p = target
   applySocPose()
   if (socPose.p === target) endSocChase() /* 收敛:姿态=scrub 渲染值,原地交还 */
 }
@@ -377,14 +378,16 @@ function build() {
       pin: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
-      /* 自动吸附:滚动停稳后若品牌字悬在飞行半途,吸附到就近端点
+      /* 自动吸附:滚动停稳后若品牌字/社交胶囊悬在飞行半途,吸到就近端点
          (自然位 p=0 / 停靠位 p=1),消除"滚到一半"的尴尬态;
+         时长拉长 + power3 缓入缓出,吸附本身更丝滑;
          吸附过程的连续滚动由 onUpdate 直接接管飞回姿态,与 snap 无冲突 */
       snap: {
-        snapTo: (v) => (v < 0.5 ? 0 : 1),
-        duration: { min: 0.15, max: 0.45 },
-        delay: 0.12,
-        ease: 'power2.inOut',
+        /* 主题换肤期间 themeScrollLock=true:原样返回当前进度,禁止吸到端点 */
+        snapTo: (v) => (themeScrollLock.value ? v : v < 0.5 ? 0 : 1),
+        duration: { min: 0.4, max: 0.95 },
+        delay: 0.05,
+        ease: 'power3.inOut',
       },
       onUpdate: (self) => {
         flyP.value = self.progress
@@ -446,17 +449,18 @@ function build() {
     },
     0,
   )
-  /* 社交胶囊对接 tab 栏:图标原地合并成连续胶囊(0–0.22),随后整颗飞往
-     栏内右侧停靠位(0.32–1,与品牌字同行程同抵),到位由 commitDock 提交
-     fixed,合并态原样停靠;收回时从栏位起飞追赶回家 */
+  /* 社交胶囊对接 tab 栏:图标原地合并成连续胶囊(0–0.34,缓入缓出),
+     随后整颗飞往栏内右侧停靠位(0.28–1,与合并段轻微重叠、与品牌字同抵),
+     到位由 commitDock 提交 fixed,合并态原样停靠;收回时从栏位起飞追赶回家。
+     gap/圆角可用 ease;位移必须 ease:none,与 applySocPose 线性公式交接零跳变 */
   if (socialStageEl && socialRowEl && socNat) {
     const socialRow = socialRowEl
+    const merge = { duration: 0.34, ease: 'power2.inOut' }
     tl.to(
       socialRow,
       {
         gap: 0,
-        duration: 0.22,
-        ease: 'none',
+        ...merge,
       },
       0,
     )
@@ -471,8 +475,7 @@ function build() {
         middleItems,
         {
           borderRadius: 0,
-          duration: 0.22,
-          ease: 'none',
+          ...merge,
         },
         0,
       )
@@ -481,8 +484,7 @@ function build() {
       firstItem,
       {
         borderRadius: `${radiusVal} 0 0 ${radiusVal}`,
-        duration: 0.22,
-        ease: 'none',
+        ...merge,
       },
       0,
     )
@@ -490,21 +492,21 @@ function build() {
       lastItem,
       {
         borderRadius: `0 ${radiusVal} ${radiusVal} 0`,
-        duration: 0.22,
-        ease: 'none',
+        ...merge,
       },
       0,
     )
-    /* 飞行:整颗胶囊对接 tab 栏右侧(主题开关左),与品牌字同抵 */
+    /* 飞行:整颗胶囊对接 tab 栏右侧(主题开关左),与品牌字同抵;
+       略早于合并结束起飞,重叠段像「边合边走」,吸附更连贯 */
     tl.to(
       socialRow,
       {
         x: () => (socNat ? socDockLeft() - socNat.left : 0),
         y: () => (socNat ? SOCIAL_TOP - socNat.docTop : 0),
         ease: 'none',
-        duration: 0.68,
+        duration: 0.72,
       },
-      0.32,
+      0.28,
     )
   }
   st = tl.scrollTrigger
@@ -530,7 +532,6 @@ onMounted(() => {
     build()
   })
   window.addEventListener('resize', onResize)
-  window.addEventListener('wheel', onWheelInertia, { passive: false })
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
       measure()
@@ -578,75 +579,10 @@ function navigate() {
   window.location.assign(LEGACY_HREF)
 }
 
-/* ============================================================
- * 飞行区间滚轮惯性 —— 仅 hero pin 行程内接管桌面滚轮
- * 区间内 wheel 事件转为速度累积,rAF 每帧指数衰减驱动 scrollTo;
- * 滑行停在中途由 snap 吸附到端点。触摸/键盘/滚动条保持原生,
- * scrub 仍 1:1 跟随真实滚动,零跳变交接不受影响
- * ============================================================ */
-const WHEEL_BOOST = 8 /* 滚轮增量 → 初速度放大(px/s per px) */
-const WHEEL_FRICTION = 0.94 /* 每帧速度保留率(60fps 基准) */
-const WHEEL_MIN_V = 40 /* 低于该速度(px/s)停止滑行 */
-const WHEEL_MAX_V = 4200
-
-let wheelV = 0
-let wheelRaf = null
-let wheelLast = 0
-
-function pinEndY() {
-  return st ? st.end : window.innerHeight * RANGE_VH
-}
-
-function wheelInRange(e) {
-  if (REDUCED || !st || legacyState.value !== 'idle') return false
-  if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return false
-  const y = window.scrollY
-  if (e.deltaY > 0) return y < pinEndY()
-  if (e.deltaY < 0) return y > 0 && y <= pinEndY() + 1
-  return false
-}
-
-function onWheelInertia(e) {
-  if (!wheelInRange(e)) {
-    /* 区间外的滚轮输入 = 用户接管,终止残余滑行 */
-    if (wheelRaf) stopWheelGlide()
-    return
-  }
-  e.preventDefault()
-  const unit = e.deltaMode === 1 ? 16 : 1
-  wheelV = Math.max(-WHEEL_MAX_V, Math.min(WHEEL_MAX_V, wheelV + e.deltaY * unit * WHEEL_BOOST))
-  if (!wheelRaf) {
-    wheelLast = performance.now()
-    wheelRaf = requestAnimationFrame(wheelGlide)
-  }
-}
-
-function wheelGlide(now) {
-  const dt = Math.min((now - wheelLast) / 1000, 0.05)
-  wheelLast = now
-  wheelV *= Math.pow(WHEEL_FRICTION, dt * 60)
-  const y = window.scrollY
-  if (Math.abs(wheelV) < WHEEL_MIN_V || (wheelV < 0 && y <= 0)) {
-    stopWheelGlide()
-    return
-  }
-  /* instant:绕过全局 scroll-behavior: smooth,避免双重平滑 */
-  window.scrollTo({ top: y + wheelV * dt, behavior: 'instant' })
-  wheelRaf = requestAnimationFrame(wheelGlide)
-}
-
-function stopWheelGlide() {
-  if (wheelRaf) cancelAnimationFrame(wheelRaf)
-  wheelRaf = null
-  wheelV = 0
-}
-
 onBeforeUnmount(() => {
   clearTimeout(navTimer)
-  stopWheelGlide()
   document.documentElement.style.overflow = ''
   window.removeEventListener('resize', onResize)
-  window.removeEventListener('wheel', onWheelInertia)
   retractPending = false
   if (expandTween) expandTween.kill()
   endFlyChase()
@@ -730,9 +666,17 @@ onBeforeUnmount(() => {
 .hero-social {
   position: relative;
   margin-top: 8px;
-  /* 社交行整体由 GSAP 驱动离场动画,这里不再保留 opacity transition,
-     避免与 scrub 驱动的位移动画冲突;transform 入场也关闭,让 scroll 动画完全接管。 */
-  transition: none;
+}
+/* 入场:纯淡入(覆盖全局 .reveal 的上移);位移由 GSAP 写在 .social-row 上,不冲突 */
+.hero-social.reveal,
+.hero-social.reveal-after-boot:not(.is-visible) {
+  opacity: 0;
+  transform: none;
+  transition: opacity 0.55s var(--ease);
+}
+.hero-social.reveal.is-visible {
+  opacity: 1;
+  transform: none;
 }
 .social-stage {
   position: relative;

@@ -66,13 +66,11 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  /* 必须 auto:smooth 会让 ScrollTrigger scrub 与真实滚动脱节,品牌字飞行像"废了" */
+  scroll-behavior: auto;
   scroll-padding-top: 24px;
-  /* 预留滚动条槽:系统条显隐 / 主题 VT 锁滚时不挤动内容与右上 fixed 按钮 */
-  scrollbar-gutter: stable;
-  /* 标准滚动条着色,随 data-theme 变量走;比仅 webkit 伪元素在主题切换后更稳 */
-  scrollbar-width: thin;
-  scrollbar-color: var(--shadow-dark) var(--bg);
+  /* 隐藏滚动条,滚轮/触控/键盘仍可滚动;换肤 scroll 钉位见 useTheme */
+  scrollbar-width: none;
 }
 
 body {
@@ -120,21 +118,7 @@ html.theme-transition *::after {
     color 0.4s var(--ease),
     border-color 0.4s var(--ease),
     fill 0.4s var(--ease),
-    stroke 0.4s var(--ease),
-    scrollbar-color 0.4s var(--ease) !important;
-}
-
-/* 主题帘形 VT 活动期:锁滚 + 藏真滚动条。
-   根快照不含系统条,避免帘内假页与帘外真条叠色/双条;
-   scrollbar-gutter:stable 保槽位,overflow 切换不横跳。 */
-html.theme-vt-active {
-  overflow: hidden;
-  scrollbar-width: none;
-  scrollbar-color: transparent transparent;
-}
-html.theme-vt-active::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+    stroke 0.4s var(--ease) !important;
 }
 
 /* ---------- 主题切换:帘形遮罩横拉(View Transitions API) ----------
@@ -193,16 +177,11 @@ ul {
   list-style: none;
 }
 
-/* scrollbar(webkit 补强;标准属性见 html 规则) */
+/* 隐藏滚动条(webkit);Firefox 见 html 的 scrollbar-width: none */
 html::-webkit-scrollbar {
-  width: 8px;
-}
-html::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-html::-webkit-scrollbar-thumb {
-  background: var(--shadow-dark);
-  border-radius: var(--radius-full);
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::selection {

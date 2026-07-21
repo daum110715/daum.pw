@@ -31,3 +31,8 @@ export const activePage = ref(1)
 /** 开屏 preloader 完成(main.js finishBoot 写入):preloader 透明底,
  *  非首页刷新时 tab 栏不加闸门会透过 preloader 抢跑 */
 export const bootDone = ref(false)
+
+/** 主题切换中:为 true 时 pin 段 snap 返回当前进度(不吸附端点)。
+ *  color-scheme/滚动条换肤会触发布局重排 → ST snap 把滚轮拽到 0/1,
+ *  中途飞行被瞬间钉死——ThemeToggle/useTheme 在换肤前后开关此锁 */
+export const themeScrollLock = ref(false)
