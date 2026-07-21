@@ -33,32 +33,36 @@
           <span class="visually-hidden">{{ BRAND_TEXT }}</span>
         </h1>
       </div>
-      <div class="hero-social reveal reveal-after-boot" :style="socialStyle">
-        <a
-          v-for="s in social"
-          :key="s.url"
-          :href="s.url"
-          class="social-icon"
-          :aria-label="s.name"
-          :target="s.url.startsWith('mailto:') ? undefined : '_blank'"
-          rel="noopener"
-        >
-          <Icon
-            :icon="s.key === 'email' ? 'lucide:mail' : `simple-icons:${s.key}`"
-            width="22"
-            height="22"
-          />
-        </a>
-        <!-- 旧版站点入口:宽框 + 图标 + 文字,指向随站部署的 legacy 子站(./legacy/) -->
-        <a
-          href="./legacy/"
-          class="legacy-link"
-          title="旧版站点"
-          @click="goLegacy"
-        >
-          <Icon icon="lucide:rotate-ccw" width="20" height="20" />
-          <span>旧版</span>
-        </a>
+      <div class="hero-social reveal reveal-after-boot">
+        <div class="social-stage">
+          <div class="social-row">
+            <a
+              v-for="s in social"
+              :key="s.url"
+              :href="s.url"
+              class="social-icon"
+              :aria-label="s.name"
+              :target="s.url.startsWith('mailto:') ? undefined : '_blank'"
+              rel="noopener"
+            >
+              <Icon
+                :icon="s.key === 'email' ? 'lucide:mail' : `simple-icons:${s.key}`"
+                width="22"
+                height="22"
+              />
+            </a>
+            <!-- 旧版站点入口:宽框 + 图标 + 文字,指向随站部署的 legacy 子站(./legacy/) -->
+            <a
+              href="./legacy/"
+              class="legacy-link"
+              title="旧版站点"
+              @click="goLegacy"
+            >
+              <Icon icon="lucide:rotate-ccw" width="20" height="20" />
+              <span>旧版</span>
+            </a>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -93,32 +97,185 @@ gsap.registerPlugin(ScrollTrigger)
 /* ============================================================
  * 品牌字真身飞入 tab 栏 —— GSAP ScrollTrigger pin + scrub
  * (与旧版项目展示栏同一库同一技法):
- * hero 被 pin 在视口顶,滚动行程(RANGE_VH·vh)即动画进度——
- * p 0→0.7 品牌字整体 transform 缩小平移到左上停靠位;
- * p 0.75→1 同一个 SVG 内的 5 条数字路径平移摊开(左→右微交错),
- * 空槽由 PagePager 的 3/4/7/8 新数字补入——自始至终就这一个元素,
- * 无交接、无替身、无重影。
- * 进度可正放可倒放,滚多少走多少。滚过终点 onLeave 时 h1 提交为
- * fixed 钉住(视觉零跳变),回滚 onEnterBack 恢复 scrub 接管。
- * 数字展开由 flyP(=st.progress)驱动 PagePager。
+ * hero 被 pin 在视口顶,滚动行程(RANGE_VH·vh)即飞行进度——
+ * 品牌字整体 transform 缩小平移到左上停靠位,滚多少走多少。
+ * 展开/收回是独立完整动画,不占滚动行程:
+ * 到位(onLeave)后数字以 back.out 弹性自己弹开("12569→123456789"),
+ * 回滚(onEnterBack)时先收回、scrub 再接管飞回。
  * ============================================================ */
 const TARGET_FS = 40 /* 停靠字号 px:svg height=1em,故=停靠高度 */
 const TARGET_TOP = 10
 const SLOT_GAP = 12 /* 宽松态每个数字槽的加宽量 px */
-const LEFT_MARGIN = 16 /* daum 贴视口左边缘的留白 */
-const RANGE_VH = 0.8 /* pin 行程(视口高倍数)= p 0→1 */
+const LEFT_MARGIN = 28 /* daum 贴视口左边缘的留白 */
+const RANGE_VH = 0.4 /* pin 行程(视口高倍数)= p 0→1 */
 const SLOT_OF = [0, 1, 4, 5, 8] /* 1/2/5/6/9 在 9 槽中的槽位 */
 const VB_W = 5295.5 /* BRAND_VIEWBOX 宽,px→viewBox 单位换算用 */
 
 const slotRef = ref(null)
 const titleRef = ref(null)
 const pathRefs = []
-const scrollYVal = ref(0)
 let nat = null /* 自然态几何 {fs,left,docTop,svgH,digitCx[5]} */
 let spreadDeltas = null /* 各数字 path 摊开位移(viewBox 单位),computeDock 算 */
 let tl = null
 let st = null
 let committed = false /* onLeave 后 h1 已提交 fixed 钉住 */
+
+/* ---------- 展开/收回:独立完整动画,不占滚动行程 ---------- */
+const expandState = { v: 0 } /* 展开度 0-1(back.out 可短暂 >1 过冲) */
+let expandTween = null
+
+function applyExpansion() {
+  const e = expandState.v
+  flyEase.value = e
+  if (spreadDeltas) {
+    for (let j = 0; j < 5; j++) {
+      gsap.set(pathRefs[4 + j], { x: spreadDeltas[j] * e })
+    }
+  }
+}
+
+/* to=1 弹开(back.out 带过冲),to=0 收回。
+   收到反向触发时立即打断当前补间并从当前状态折返,避免展开中途被收回
+   时先冲到全开再收——3478 数字会因此出现又突然消失;收回期间
+   (retractPending)h1 保持 committed,onUpdate 每帧把 scrub 写入的飞行
+   transform 清回停靠姿态,收回没做完品牌字一动不动;播完 flyBack 从停靠
+   位平滑追赶到当前进度再交还 scrub */
+let expandTarget = 0
+let retractPending = false
+let flyChasing = false /* 飞回追赶中:每帧指数逼近 st.progress,无"目标过期" */
+
+function driveExpansion(to) {
+  if (expandTarget === to && expandTween && expandTween.isActive()) return
+  if (expandTween) expandTween.kill()
+  expandTarget = to
+  expandTween = gsap.to(expandState, {
+    v: to,
+    duration: to === 1 ? 0.6 : 0.35,
+    ease: to === 1 ? 'back.out(1.4)' : 'power2.inOut',
+    onUpdate: applyExpansion,
+    onComplete: () => {
+      applyExpansion()
+      const want = st && st.progress >= 1 ? 1 : 0
+      if (want !== to) {
+        driveExpansion(want)
+        return
+      }
+      if (want === 1) {
+        retractPending = false /* 期间又滚回来了,取消待飞回 */
+        return
+      }
+      if (to === 0 && retractPending) {
+        retractPending = false
+        flyBack()
+      }
+    },
+  })
+}
+
+/* 飞回姿态:与 scrub 飞行 tween 同公式(位移/缩放均随 p 线性),
+   故 applyFlyPose(progress) ≡ scrub 渲染结果,交接处零跳变 */
+const flyPose = { p: 1 }
+function applyFlyPose() {
+  if (!nat) return
+  const p = flyPose.p
+  const rto = TARGET_FS / nat.fs
+  titleRef.value.style.transform = `translate(${(dockGeo.left - nat.left) * p}px, ${(TARGET_TOP - nat.docTop) * p}px) scale(${1 + (rto - 1) * p})`
+}
+
+/* 收回播完:h1 交还 scrub。自停靠位(p=1,与 fixed 视觉一致)起飞,
+   每帧指数追赶 st.progress——目标随滚动(snap/惯性/用户)实时变化,
+   追赶永不"过期";目标静止则自然收敛,原地交还 scrub。
+   (旧实现:0.25s 固定终点补间 + 滚动即杀——snap 延迟 0.12s 小于收回
+   0.35s,必然在收回途中挪动进度;杀补间瞬间姿态从 p=1 跳变到当前
+   进度,即快速收回时瞬移的根因) */
+function flyChase(_time, deltaTime) {
+  const target = st ? st.progress : 0
+  const k = 1 - Math.pow(0.82, (deltaTime || 16.667) / 16.667) /* 帧率无关追赶系数 */
+  flyPose.p += (target - flyPose.p) * k
+  if (Math.abs(target - flyPose.p) < 0.002) flyPose.p = target
+  applyFlyPose()
+  if (flyPose.p === target) endFlyChase() /* 收敛:姿态=scrub 渲染值,原地交还 */
+}
+
+function endFlyChase() {
+  if (!flyChasing) return
+  flyChasing = false
+  gsap.ticker.remove(flyChase)
+}
+
+function flyBack() {
+  if (!committed || !nat) return
+  committed = false
+  endFlyChase()
+  const el = titleRef.value
+  slotRef.value.appendChild(el)
+  el.style.position = ''
+  el.style.margin = ''
+  el.style.left = ''
+  el.style.top = ''
+  el.style.fontSize = ''
+  slotRef.value.style.height = ''
+  el.style.transformOrigin = 'top left'
+  flyPose.p = 1
+  applyFlyPose()
+  flyChasing = true
+  gsap.ticker.add(flyChase)
+  /* 社交胶囊同步回家:回到 hero 原位,同法追赶交还 scrub */
+  if (socialRowEl && socialStageEl && socNat) {
+    endSocChase()
+    const s = socialRowEl
+    socialStageEl.appendChild(s)
+    s.style.position = ''
+    s.style.margin = ''
+    s.style.left = ''
+    s.style.right = ''
+    s.style.top = ''
+    s.style.zIndex = ''
+    socPose.p = 1
+    applySocPose()
+    socChasing = true
+    gsap.ticker.add(socChase)
+  }
+}
+
+/* ============================================================
+ * 社交胶囊对接 tab 栏 —— 与品牌字同法:自然位测量、scrub 飞行、
+ * commitDock 提交 fixed、flyBack 追赶回家;合并态原样停靠,不参与展开
+ * ============================================================ */
+const SOCIAL_TOP = 6 /* 与 pager 胶囊同顶线(dockGeo.top 10 - 4) */
+const SOCIAL_RIGHT = 98 /* 主题开关(right 18 + 宽 64)+ 16 间距 */
+
+let socialStageEl = null
+let socialRowEl = null
+let socialItemEls = []
+let socNat = null /* 自然态几何 {left,docTop,mergedW} */
+const socPose = { p: 1 }
+let socChasing = false
+
+function socDockLeft() {
+  return window.innerWidth - SOCIAL_RIGHT - socNat.mergedW
+}
+
+function applySocPose() {
+  if (!socNat || !socialRowEl) return
+  const p = socPose.p
+  socialRowEl.style.transform = `translate(${(socDockLeft() - socNat.left) * p}px, ${(SOCIAL_TOP - socNat.docTop) * p}px)`
+}
+
+function socChase(_time, deltaTime) {
+  const target = st ? st.progress : 0
+  const k = 1 - Math.pow(0.82, (deltaTime || 16.667) / 16.667)
+  socPose.p += (target - socPose.p) * k
+  if (Math.abs(target - socPose.p) < 0.002) socPose.p = target
+  applySocPose()
+  if (socPose.p === target) endSocChase() /* 收敛:姿态=scrub 渲染值,原地交还 */
+}
+
+function endSocChase() {
+  if (!socChasing) return
+  socChasing = false
+  gsap.ticker.remove(socChase)
+}
 
 /* 自然态测量(hero 未被 pin/无 transform 时):一次测量,停靠几何纯按比例换算 */
 function measure() {
@@ -139,6 +296,14 @@ function measure() {
       return b.left + b.width / 2 - r.left
     }),
     digitH: digitEls[0].getBoundingClientRect().height,
+  }
+  if (socialRowEl && socialItemEls.length) {
+    const r = socialRowEl.getBoundingClientRect()
+    socNat = {
+      left: r.left,
+      docTop: r.top + window.scrollY,
+      mergedW: socialItemEls.reduce((sum, it) => sum + it.offsetWidth, 0),
+    }
   }
   computeDock()
 }
@@ -175,6 +340,7 @@ function computeDock() {
 function commitDock() {
   if (committed || !nat) return
   committed = true
+  endFlyChase()
   const el = titleRef.value
   slotRef.value.style.height = `${nat.svgH}px`
   gsap.set(el, { clearProps: 'transform' })
@@ -184,24 +350,19 @@ function commitDock() {
   el.style.left = `${dockGeo.left}px`
   el.style.top = `${dockGeo.top}px`
   el.style.fontSize = `${TARGET_FS}px`
-}
-
-  /* 回滚进触发区(onEnterBack):撤掉 fixed,按当前 progress 摆回 scrub 姿态,
-   之后由 scrub 接管——无一帧跳变。移动段只占 p 0→0.7,先归一化 */
-function uncommitDock() {
-  if (!committed || !nat) return
-  committed = false
-  const el = titleRef.value
-  slotRef.value.appendChild(el) /* 放回 slot,恢复 scrub 接管 */
-  el.style.position = ''
-  el.style.margin = ''
-  el.style.left = ''
-  el.style.top = ''
-  el.style.fontSize = ''
-  slotRef.value.style.height = ''
-  const pm = Math.min(1, (st ? st.progress : 0) / 0.7)
-  el.style.transformOrigin = 'top left'
-  el.style.transform = `translate(${(dockGeo.left - nat.left) * pm}px, ${(TARGET_TOP - nat.docTop) * pm}px) scale(${1 + (TARGET_FS / nat.fs - 1) * pm})`
+  /* 社交胶囊同法提交:钉进 tab 栏右侧空白(pager 同顶线,主题开关左) */
+  if (socialRowEl && socNat) {
+    endSocChase()
+    const s = socialRowEl
+    gsap.set(s, { clearProps: 'transform' })
+    document.body.appendChild(s)
+    s.style.position = 'fixed'
+    s.style.margin = '0'
+    s.style.left = 'auto'
+    s.style.right = `${SOCIAL_RIGHT}px`
+    s.style.top = `${SOCIAL_TOP}px`
+    s.style.zIndex = '60'
+  }
 }
 
 function build() {
@@ -216,23 +377,61 @@ function build() {
       pin: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
+      /* 自动吸附:滚动停稳后若品牌字悬在飞行半途,吸附到就近端点
+         (自然位 p=0 / 停靠位 p=1),消除"滚到一半"的尴尬态;
+         吸附过程的连续滚动由 onUpdate 直接接管飞回姿态,与 snap 无冲突 */
+      snap: {
+        snapTo: (v) => (v < 0.5 ? 0 : 1),
+        duration: { min: 0.15, max: 0.45 },
+        delay: 0.12,
+        ease: 'power2.inOut',
+      },
       onUpdate: (self) => {
-        const p = self.progress
-        flyP.value = p
-        /* 展开单一驱动:p 0.75→1 经 smoothstep 缓动后广播——
-           SVG 数字位置、PagePager 槽宽/新数字全用这一条曲线,
-           任意进度下每个数字都严丝合缝落在自己槽位,不叠字 */
-        const t = Math.min(1, Math.max(0, (p - 0.75) / 0.25))
-        const e = t * t * (3 - 2 * t)
-        flyEase.value = e
-        if (spreadDeltas) {
-          for (let j = 0; j < 5; j++) {
-            gsap.set(pathRefs[4 + j], { x: spreadDeltas[j] * e })
-          }
+        flyP.value = self.progress
+        /* 收回 pending 期间 h1 仍是 fixed:scrub 每次渲染都会把飞行 transform
+           写上来 → 立即清回停靠姿态,视觉上钉死不动 */
+        if (committed) {
+          gsap.set(titleRef.value, { clearProps: 'transform' })
+          return
+        }
+        /* 飞回追赶中进度冲到 1(用户/snap 直冲停靠位):立即贴齐,
+           commitDock 随之钉住零跳变;其余情况追赶每帧自读 st.progress,
+           无需干预——scrub 写入会被 ticker 上的追赶姿态覆盖,同公式同序 */
+        if (flyChasing && self.progress >= 1) {
+          endFlyChase()
+          flyPose.p = 1
+          applyFlyPose()
+        }
+        if (socChasing && self.progress >= 1) {
+          endSocChase()
+          socPose.p = 1
+          applySocPose()
         }
       },
-      onLeave: commitDock,
-      onEnterBack: uncommitDock,
+      onLeave: () => {
+        commitDock()
+        driveExpansion(1) /* 到位后独立弹开(h1 已钉住,页面可继续滚) */
+      },
+      onEnterBack: () => {
+        /* 回滚:h1 保持停靠钉住(onUpdate 每帧钳回),收回动画完整播完
+           后 flyBack 平滑追赶交还 scrub——收回没做完品牌字不动 */
+        retractPending = true
+        driveExpansion(0)
+      },
+      /* invalidateOnRefresh 的 refresh(如 fonts.ready 二次刷新)会按
+         progress=1 重渲染 timeline,把飞行 transform 写回已提交的
+         h1(非首页刷新时品牌字被扔出视口的根因)——重新断言 fixed 终态 */
+      onRefresh: (self) => {
+        if (!committed) {
+          flyP.value = self.progress
+          return
+        }
+        const el = titleRef.value
+        gsap.set(el, { clearProps: 'transform' })
+        el.style.left = `${dockGeo.left}px`
+        el.style.top = `${dockGeo.top}px`
+        el.style.fontSize = `${TARGET_FS}px`
+      },
     },
   })
   tl.to(
@@ -243,18 +442,72 @@ function build() {
       scale: () => TARGET_FS / nat.fs,
       transformOrigin: 'top left',
       ease: 'none',
-      duration: 0.7,
+      duration: 1,
     },
     0,
   )
-  /* 时间轴补满到时长 1:移动段 0→0.7 到位后静止,
-     展开段 0.75→1 由 onUpdate 经 flyEase 手工驱动(无补间) */
-  tl.set({}, {}, 1)
+  /* 社交胶囊对接 tab 栏:图标原地合并成连续胶囊(0–0.22),随后整颗飞往
+     栏内右侧停靠位(0.32–1,与品牌字同行程同抵),到位由 commitDock 提交
+     fixed,合并态原样停靠;收回时从栏位起飞追赶回家 */
+  if (socialStageEl && socialRowEl && socNat) {
+    const socialRow = socialRowEl
+    tl.to(
+      socialRow,
+      {
+        gap: 0,
+        duration: 0.22,
+        ease: 'none',
+      },
+      0,
+    )
+    /* 合并时同步把中间子元素圆角收平、首尾保留外侧圆角,形成一个连续大按钮 */
+    const radiusVal =
+      getComputedStyle(document.documentElement).getPropertyValue('--radius').trim() || '18px'
+    const firstItem = socialItemEls[0]
+    const lastItem = socialItemEls[socialItemEls.length - 1]
+    const middleItems = socialItemEls.slice(1, -1)
+    if (middleItems.length) {
+      tl.to(
+        middleItems,
+        {
+          borderRadius: 0,
+          duration: 0.22,
+          ease: 'none',
+        },
+        0,
+      )
+    }
+    tl.to(
+      firstItem,
+      {
+        borderRadius: `${radiusVal} 0 0 ${radiusVal}`,
+        duration: 0.22,
+        ease: 'none',
+      },
+      0,
+    )
+    tl.to(
+      lastItem,
+      {
+        borderRadius: `0 ${radiusVal} ${radiusVal} 0`,
+        duration: 0.22,
+        ease: 'none',
+      },
+      0,
+    )
+    /* 飞行:整颗胶囊对接 tab 栏右侧(主题开关左),与品牌字同抵 */
+    tl.to(
+      socialRow,
+      {
+        x: () => (socNat ? socDockLeft() - socNat.left : 0),
+        y: () => (socNat ? SOCIAL_TOP - socNat.docTop : 0),
+        ease: 'none',
+        duration: 0.68,
+      },
+      0.32,
+    )
+  }
   st = tl.scrollTrigger
-}
-
-function onScroll() {
-  scrollYVal.value = window.scrollY
 }
 
 function onResize() {
@@ -268,20 +521,16 @@ function onResize() {
   }
 }
 
-/* 社交行(含旧版入口):下滚前 200px 内淡出消失,不跟着品牌飞 */
-const socialStyle = computed(() => {
-  const o = Math.max(0, 1 - scrollYVal.value / 200)
-  if (o === 1) return {}
-  return { opacity: o, pointerEvents: o === 0 ? 'none' : '' }
-})
-
 onMounted(() => {
+  socialStageEl = document.querySelector('.social-stage')
+  socialRowEl = document.querySelector('.social-row')
+  socialItemEls = socialRowEl ? Array.from(socialRowEl.children) : []
   requestAnimationFrame(() => {
     measure()
     build()
   })
-  window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('resize', onResize)
+  window.addEventListener('wheel', onWheelInertia, { passive: false })
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
       measure()
@@ -329,11 +578,79 @@ function navigate() {
   window.location.assign(LEGACY_HREF)
 }
 
+/* ============================================================
+ * 飞行区间滚轮惯性 —— 仅 hero pin 行程内接管桌面滚轮
+ * 区间内 wheel 事件转为速度累积,rAF 每帧指数衰减驱动 scrollTo;
+ * 滑行停在中途由 snap 吸附到端点。触摸/键盘/滚动条保持原生,
+ * scrub 仍 1:1 跟随真实滚动,零跳变交接不受影响
+ * ============================================================ */
+const WHEEL_BOOST = 8 /* 滚轮增量 → 初速度放大(px/s per px) */
+const WHEEL_FRICTION = 0.94 /* 每帧速度保留率(60fps 基准) */
+const WHEEL_MIN_V = 40 /* 低于该速度(px/s)停止滑行 */
+const WHEEL_MAX_V = 4200
+
+let wheelV = 0
+let wheelRaf = null
+let wheelLast = 0
+
+function pinEndY() {
+  return st ? st.end : window.innerHeight * RANGE_VH
+}
+
+function wheelInRange(e) {
+  if (REDUCED || !st || legacyState.value !== 'idle') return false
+  if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return false
+  const y = window.scrollY
+  if (e.deltaY > 0) return y < pinEndY()
+  if (e.deltaY < 0) return y > 0 && y <= pinEndY() + 1
+  return false
+}
+
+function onWheelInertia(e) {
+  if (!wheelInRange(e)) {
+    /* 区间外的滚轮输入 = 用户接管,终止残余滑行 */
+    if (wheelRaf) stopWheelGlide()
+    return
+  }
+  e.preventDefault()
+  const unit = e.deltaMode === 1 ? 16 : 1
+  wheelV = Math.max(-WHEEL_MAX_V, Math.min(WHEEL_MAX_V, wheelV + e.deltaY * unit * WHEEL_BOOST))
+  if (!wheelRaf) {
+    wheelLast = performance.now()
+    wheelRaf = requestAnimationFrame(wheelGlide)
+  }
+}
+
+function wheelGlide(now) {
+  const dt = Math.min((now - wheelLast) / 1000, 0.05)
+  wheelLast = now
+  wheelV *= Math.pow(WHEEL_FRICTION, dt * 60)
+  const y = window.scrollY
+  if (Math.abs(wheelV) < WHEEL_MIN_V || (wheelV < 0 && y <= 0)) {
+    stopWheelGlide()
+    return
+  }
+  /* instant:绕过全局 scroll-behavior: smooth,避免双重平滑 */
+  window.scrollTo({ top: y + wheelV * dt, behavior: 'instant' })
+  wheelRaf = requestAnimationFrame(wheelGlide)
+}
+
+function stopWheelGlide() {
+  if (wheelRaf) cancelAnimationFrame(wheelRaf)
+  wheelRaf = null
+  wheelV = 0
+}
+
 onBeforeUnmount(() => {
   clearTimeout(navTimer)
+  stopWheelGlide()
   document.documentElement.style.overflow = ''
-  window.removeEventListener('scroll', onScroll)
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('wheel', onWheelInertia)
+  retractPending = false
+  if (expandTween) expandTween.kill()
+  endFlyChase()
+  endSocChase()
   if (st) st.kill()
   if (tl) tl.kill()
   st = null
@@ -356,7 +673,7 @@ onBeforeUnmount(() => {
   z-index: 55;
   pointer-events: none;
 }
-/* 社交行恢复可点(淡出时 socialStyle 会再关掉) */
+/* 社交行恢复可点;其离场动画由 hero ScrollTrigger 驱动 */
 .hero-social {
   pointer-events: auto;
 }
@@ -411,9 +728,22 @@ onBeforeUnmount(() => {
   }
 }
 .hero-social {
+  position: relative;
+  margin-top: 8px;
+  /* 社交行整体由 GSAP 驱动离场动画,这里不再保留 opacity transition,
+     避免与 scrub 驱动的位移动画冲突;transform 入场也关闭,让 scroll 动画完全接管。 */
+  transition: none;
+}
+.social-stage {
+  position: relative;
+  display: inline-block;
+  width: fit-content;
+}
+.social-row {
   display: flex;
   gap: 12px;
-  margin-top: 8px;
+  position: relative;
+  z-index: 1;
 }
 .social-icon {
   display: inline-flex;

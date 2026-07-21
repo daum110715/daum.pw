@@ -3,6 +3,7 @@ import App from './App.vue'
 import './styles/neu.css'
 import './plugins/icons.js'
 import { BRAND_PATHS } from './data/brandGlyph.js'
+import { bootDone } from './composables/brandDock.js'
 
 createApp(App).mount('#app')
 
@@ -272,6 +273,7 @@ function syncInk() {
 function finishBoot(heroTitle) {
   document.documentElement.classList.add('boot-done')
   document.body.setAttribute('aria-busy', 'false')
+  bootDone.value = true /* 放行 PagePager(防透过透明 preloader 抢跑) */
   if (heroTitle) {
     heroTitle.classList.remove('handoff-pending')
     heroTitle.classList.add('is-landed')

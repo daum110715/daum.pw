@@ -21,9 +21,13 @@ export const dockGeo = reactive({
 /** 动画进度 0-1 = ScrollTrigger scrub progress(Hero 写入,PagePager 消费) */
 export const flyP = ref(0)
 
-/** 展开进度 0-1(smoothstep 已缓动):Hero 写入并驱动 SVG 数字摊开,
- *  PagePager 消费同一值撑槽/补新数字——单一曲线,任意进度不错位 */
+/** 展开度 0-1:Hero 的独立展开/收回补间(到位弹开 back.out、回滚收回)
+ *  写入,PagePager 消费同一值撑槽/补新数字——单一驱动,任意时刻不错位 */
 export const flyEase = ref(0)
 
 /** 当前所在页(1-9),PagePager 的 IntersectionObserver 写入并自用于高亮 */
 export const activePage = ref(1)
+
+/** 开屏 preloader 完成(main.js finishBoot 写入):preloader 透明底,
+ *  非首页刷新时 tab 栏不加闸门会透过 preloader 抢跑 */
+export const bootDone = ref(false)
