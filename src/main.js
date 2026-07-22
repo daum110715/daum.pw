@@ -5,7 +5,72 @@ import './plugins/icons.js'
 import { BRAND_PATHS } from './data/brandGlyph.js'
 import { bootDone } from './composables/brandDock.js'
 
+/**
+ * 非首页刷新:
+ * 浏览器自动滚位会让 Hero 离屏 → ST 直接 progress=1 钉停靠 → handoff 飞向顶栏,
+ * 开屏「描边 → 大标题」被短路。head 已 scrollRestoration=manual;
+ * 此处再读 sessionStorage(pagehide 写入)+ 当前 scroll 作兜底,
+ * boot 全程锁在顶部完成 preloader;bootResumeY>1 时走 handoffResume
+ * (飞向停靠/中段恢复,不经大标题),finishBoot 后再还原并 sync 停靠。
+ */
+const SCROLL_KEY = 'daum-scroll-y'
+let bootResumeY = 0
+try {
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+} catch (e) {
+  /* ignore */
+}
+try {
+  const raw = sessionStorage.getItem(SCROLL_KEY)
+  if (raw != null && raw !== '') {
+    bootResumeY = Math.max(0, parseInt(raw, 10) || 0)
+    sessionStorage.removeItem(SCROLL_KEY)
+  }
+} catch (e) {
+  /* ignore */
+}
+bootResumeY = Math.max(
+  bootResumeY,
+  window.scrollY || 0,
+  document.documentElement.scrollTop || 0,
+  document.body.scrollTop || 0,
+)
+
+function lockBootScroll() {
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
+  window.scrollTo(0, 0)
+}
+function unlockBootScroll() {
+  document.documentElement.style.overflow = ''
+  document.body.style.overflow = ''
+}
+lockBootScroll()
+
+/** 防个别引擎在内容增高后仍偷滚: boot 未完成前强制顶 */
+const clampBootScroll = () => {
+  if (bootDone.value) return
+  if ((window.scrollY || document.documentElement.scrollTop || 0) > 0) {
+    window.scrollTo(0, 0)
+  }
+}
+window.addEventListener('scroll', clampBootScroll, { passive: true })
+
+/** 刷新/离开前记下位置,供下次 boot 结束后还原(SPA 空壳时 scrollY 恒 0,不能只靠加载瞬间读取) */
+window.addEventListener('pagehide', () => {
+  try {
+    const y = bootDone.value
+      ? window.scrollY || document.documentElement.scrollTop || 0
+      : Math.max(bootResumeY, window.scrollY || 0)
+    sessionStorage.setItem(SCROLL_KEY, String(Math.round(y)))
+  } catch (e) {
+    /* ignore */
+  }
+})
+
 createApp(App).mount('#app')
+/* 挂载后文档变高,再钉一次顶,避免测量/ST 建在中段 */
+lockBootScroll()
 
 /* ============================================================
  * 旧版回流到达幕布
@@ -269,13 +334,57 @@ function syncInk() {
   return brandInk()
 }
 
-/** 共享收尾:揭示 Hero 标题 + 级联 reveal-after-boot。挂 window 供 index.html 兜底复用。
-    主题切换按钮(.theme-floating)不在此级联:正常路径由进度条变形归位后 revealToggle 点亮 */
-function finishBoot(heroTitle) {
+/**
+ * 开屏结束后还原刷新前滚动,并钉品牌/社交停靠(非首页收尾)。
+ * landTitle: 非首页路径在 sync 停靠姿态后再亮标题,避免大标题闪现后瞬移顶栏。
+ * 返回 Promise:handoffResume 可在 commit 后再卸飞行克隆。
+ */
+function restoreScrollAfterBoot(opts = {}) {
+  window.removeEventListener('scroll', clampBootScroll)
+  unlockBootScroll()
+  if (bootResumeY <= 1) {
+    if (opts.landTitle) {
+      const t = document.querySelector('.hero-title')
+      if (t) {
+        t.classList.remove('handoff-pending')
+        t.classList.add('is-landed')
+      }
+    }
+    return Promise.resolve()
+  }
+  // 'auto' 兼容性优于 'instant'(部分引擎不认 instant 会整段忽略)
+  window.scrollTo(0, bootResumeY)
+  // 双 rAF:等 pin-spacer / 布局随 scroll 稳定后再 refresh ST
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (typeof window.__syncBrandDockForBoot === 'function') {
+          window.__syncBrandDockForBoot({ landTitle: !!opts.landTitle })
+        } else if (opts.landTitle) {
+          const t = document.querySelector('.hero-title')
+          if (t) {
+            t.classList.remove('handoff-pending')
+            t.classList.add('is-landed')
+          }
+        }
+        resolve()
+      })
+    })
+  })
+}
+
+/**
+ * 共享收尾:揭示 Hero 标题 + 级联 reveal-after-boot。挂 window 供 index.html 兜底复用。
+ * 主题切换按钮(.theme-floating)不在此级联:正常路径由进度条变形归位后 revealToggle 点亮。
+ * opts.resume: 非首页刷新——保持 handoff-pending,还原 scroll 并按进度停靠后再亮标题。
+ * 返回 Promise(restore/sync 完成),首页路径立即 resolve。
+ */
+function finishBoot(heroTitle, opts = {}) {
   document.documentElement.classList.add('boot-done')
   document.body.setAttribute('aria-busy', 'false')
   bootDone.value = true /* 放行 PagePager(防透过透明 preloader 抢跑) */
-  if (heroTitle) {
+  const resume = !!(opts.resume || bootResumeY > 1)
+  if (heroTitle && !resume) {
     heroTitle.classList.remove('handoff-pending')
     heroTitle.classList.add('is-landed')
   }
@@ -284,6 +393,7 @@ function finishBoot(heroTitle) {
     .forEach((node, i) => {
       window.setTimeout(() => node.classList.add('is-visible'), 80 + i * 90)
     })
+  return restoreScrollAfterBoot({ landTitle: resume })
 }
 /** 点亮主题切换按钮。instant:跳过 .reveal 过渡立即呈现——
     变形接管时假进度条正盖在同位,必须瞬亮后下一帧撤假条才零跳变 */
@@ -361,6 +471,143 @@ function assertBrandSync() {
   }
 }
 
+/**
+ * 量测 ThemeToggle 变形终点(与首页 handoff 共用)。
+ * 返回 { toggleEl, trackEnd, thumbEnd, endBgs } 或 null。
+ */
+function measureToggleMorphEnds() {
+  const toggleEl = document.querySelector('.theme-floating')
+  const track = toggleEl && toggleEl.querySelector('.track')
+  const thumb = toggleEl && toggleEl.querySelector('.thumb')
+  if (!toggleEl || !track || !thumb) return null
+  toggleEl.style.transition = 'none'
+  toggleEl.style.transform = 'none'
+  void toggleEl.offsetWidth
+  const trackEnd = track.getBoundingClientRect()
+  const thumbEnd = thumb.getBoundingClientRect()
+  const trackCs = getComputedStyle(track)
+  const thumbCs = getComputedStyle(thumb)
+  return {
+    toggleEl,
+    trackEnd,
+    thumbEnd,
+    endBgs: {
+      track: { color: trackCs.backgroundColor, image: trackCs.backgroundImage },
+      thumb: { color: thumbCs.backgroundColor, image: thumbCs.backgroundImage },
+    },
+  }
+}
+
+/**
+ * 非首页刷新 handoff:
+ * 不再飞向 Hero 大标题(落地后 restore 会瞬移顶栏,动画被短路成跳变)。
+ * 已过 pin 终点 → 同源克隆飞向停靠位,再 restore+commit+展开;
+ * pin 中段 → 卸 preloader,restore 后由 ST scrub 摆姿态。
+ * 进度条仍变形为 ThemeToggle(与首页同节奏)。
+ */
+async function handoffResume(el, heroTitle) {
+  el.dataset.done = '1'
+  window.scrollTo(0, 0)
+
+  const brand = document.getElementById('preloader-brand-svg')
+  const paths = [...el.querySelectorAll('.pl-char-path')]
+  const progFill = el.querySelector('.preloader__progress-fill')
+  finishDraw(paths)
+  freezeProgress(progFill)
+  if (brand) void brand.offsetWidth
+  await nextFrame()
+
+  /* 与 HeroSection RANGE_VH=0.4 对齐:超过 pin 行程视为已停靠分区 */
+  const PIN_RANGE_VH = 0.4
+  const pinEndY = Math.round(window.innerHeight * PIN_RANGE_VH)
+  const deep = bootResumeY >= pinEndY * 0.95
+
+  if (typeof window.__prepareBrandDockForBoot === 'function') {
+    window.__prepareBrandDockForBoot()
+  }
+
+  const pre = brand ? brand.getBoundingClientRect() : null
+  const dock =
+    deep && typeof window.__getBrandDockTarget === 'function'
+      ? window.__getBrandDockTarget()
+      : null
+  const canFlyDock =
+    deep && brand && pre && pre.width >= 2 && pre.height >= 2 && dock && dock.width >= 2
+
+  let clone = null
+  if (canFlyDock) {
+    clone = brand.cloneNode(true)
+    clone.setAttribute('aria-hidden', 'true')
+    clone.classList.add('pl-fly-svg')
+    clone.style.position = 'fixed'
+    clone.style.left = pre.left + 'px'
+    clone.style.top = pre.top + 'px'
+    clone.style.width = pre.width + 'px'
+    clone.style.height = pre.height + 'px'
+    clone.style.margin = '0'
+    clone.style.transformOrigin = '0 0'
+    clone.style.willChange = 'transform'
+    clone.style.zIndex = '10004'
+    clone.style.pointerEvents = 'none'
+    document.body.appendChild(clone)
+  }
+
+  const prog = el.querySelector('.preloader__progress')
+  const fill = prog && prog.querySelector('.preloader__progress-fill')
+  if (prog) {
+    const pr = prog.getBoundingClientRect()
+    document.body.appendChild(prog)
+    pinFixedBox(prog, pr, 10002)
+    prog.style.borderRadius = '9999px'
+    prog.style.overflow = 'hidden'
+  }
+
+  if (brand) brand.style.visibility = 'hidden'
+  el.style.visibility = 'hidden'
+  el.style.pointerEvents = 'none'
+  killPreloader(el)
+  window.scrollTo(0, 0)
+  await nextFrame()
+
+  const ends = measureToggleMorphEnds()
+  const morphP =
+    prog && fill && ends
+      ? morphBarToToggle(prog, fill, ends.trackEnd, ends.thumbEnd, ends.endBgs)
+      : Promise.resolve()
+
+  let brandP = Promise.resolve()
+  if (clone && dock) {
+    const dx = dock.left - pre.left
+    const dy = dock.top - pre.top
+    const sx = pre.width > 0 ? dock.width / pre.width : 1
+    const sy = pre.height > 0 ? dock.height / pre.height : 1
+    clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
+    await nextFrame()
+    clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+    brandP = onTransformEnd(clone, MOVE_MS + 200)
+  }
+
+  await Promise.all([brandP, morphP])
+
+  if (clone) clone.style.transition = 'none'
+  // 先 restore+commit 再卸克隆:停靠态真身与飞层同位,零跳变
+  await finishBoot(heroTitle, { resume: true })
+  await nextFrame()
+  if (clone) clone.remove()
+
+  if (prog && fill && ends) {
+    revealToggle(true)
+    if (ends.toggleEl) ends.toggleEl.style.transform = ''
+    await nextFrame()
+    prog.remove()
+    fill.remove()
+  } else {
+    if (prog) prog.remove()
+    if (fill) fill.remove()
+    revealToggle()
+  }
+}
+
 async function handoff() {
   const el = document.getElementById('preloader')
   const heroTitle = document.querySelector('.hero-title')
@@ -380,6 +627,19 @@ async function handoff() {
     return
   }
 
+  // 非首页刷新:勿飞大标题再 restore 瞬移——走停靠/中段恢复路径
+  if (bootResumeY > 1) {
+    try {
+      await handoffResume(el, heroTitle)
+    } catch (e) {
+      document.querySelectorAll('.pl-fly-svg').forEach((n) => n.remove())
+      killPreloader(document.getElementById('preloader'))
+      finishBoot(heroTitle, { resume: true })
+      revealToggle()
+    }
+    return
+  }
+
   const brand = document.getElementById('preloader-brand-svg')
   const heroSvg = document.querySelector('.hero-brand-svg')
   const paths = [...el.querySelectorAll('.pl-char-path')]
@@ -394,6 +654,9 @@ async function handoff() {
 
   // 入口立即占位,防 4.5s 兜底并发移除 preloader
   el.dataset.done = '1'
+
+  /* 量测前强制顶:任何中途滚位都会让 heroSvg rect 离屏,飞行目标错位 */
+  window.scrollTo(0, 0)
 
   const ink = syncInk()
 
@@ -441,6 +704,7 @@ async function handoff() {
   el.style.visibility = 'hidden'
   el.style.pointerEvents = 'none'
   killPreloader(el)
+  window.scrollTo(0, 0)
   await nextFrame()
 
   // ---- C+E 并行:字飞向 Hero + 进度条变形为 ThemeToggle(同长同节奏,条不满格停住) ----
@@ -450,26 +714,11 @@ async function handoff() {
   const sx = pre.width > 0 ? to.width / pre.width : 1
   const sy = pre.height > 0 ? to.height / pre.height : 1
 
-  const toggleEl = document.querySelector('.theme-floating')
-  const track = toggleEl && toggleEl.querySelector('.track')
-  const thumb = toggleEl && toggleEl.querySelector('.thumb')
-
-  let trackEnd = null
-  let thumbEnd = null
-  let endBgs = null
-  if (toggleEl && track && thumb) {
-    toggleEl.style.transition = 'none'
-    toggleEl.style.transform = 'none'
-    void toggleEl.offsetWidth
-    trackEnd = track.getBoundingClientRect()
-    thumbEnd = thumb.getBoundingClientRect()
-    const trackCs = getComputedStyle(track)
-    const thumbCs = getComputedStyle(thumb)
-    endBgs = {
-      track: { color: trackCs.backgroundColor, image: trackCs.backgroundImage },
-      thumb: { color: thumbCs.backgroundColor, image: thumbCs.backgroundImage },
-    }
-  }
+  const ends = measureToggleMorphEnds()
+  const trackEnd = ends && ends.trackEnd
+  const thumbEnd = ends && ends.thumbEnd
+  const endBgs = ends && ends.endBgs
+  const toggleEl = ends && ends.toggleEl
 
   clone.style.transition = `transform ${MOVE_MS}ms ${EASE}`
   await nextFrame()

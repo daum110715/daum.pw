@@ -28,8 +28,8 @@ export const flyEase = ref(0)
 /** 当前所在页(1-9),PagePager 的 IntersectionObserver 写入并自用于高亮 */
 export const activePage = ref(1)
 
-/** 开屏 preloader 完成(main.js finishBoot 写入):preloader 透明底,
- *  非首页刷新时 tab 栏不加闸门会透过 preloader 抢跑 */
+/** 开屏 preloader 完成(main.js finishBoot 写入)。
+ *  false 时:PagePager 不亮;Hero onLeave 不钉停靠(防非首页刷新短路 handoff) */
 export const bootDone = ref(false)
 
 /** 主题切换中:为 true 时 pin 段 snap 返回当前进度(不吸附端点)。

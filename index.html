@@ -24,6 +24,17 @@
     })();
   </script>
   <script>
+    // 非首页刷新:必须在首帧前关掉自动滚位。否则浏览器在 Vue/ST 就绪前把
+    // scrollY 拉到分区中段 → Hero 离屏、ScrollTrigger 直接 progress=1 钉停靠,
+    // 开屏 handoff 飞向顶栏而非大标题,完整入场被短路。main.js 会在 boot 结束后
+    // 按 sessionStorage 的 daum-scroll-y 还原。
+    (function () {
+      try {
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      } catch (e) {}
+    })();
+  </script>
+  <script>
     // 旧版回流转场:带 ?from=legacy 或本次会话去过旧版(sessionStorage 标记),
     // 首帧前挂上到达幕布标记,body::after 以新版 --bg 满幅盖住,
     // main.js 在 boot 早期触发虹膜展开,与旧版离场虹膜同语言同节奏
@@ -81,13 +92,21 @@
       --shadow-light: #2a2018;
       --shadow-dark: #0d0a07;
     }
-    /* body 背景首帧兜底:与 neu.css 同值,preloader 透明透出此背景,显隐零切换 */
+    /* body 背景首帧兜底:与 neu.css 同值;preloader 用不透明同款底遮住 #app,卸掉时零跳变 */
     body {
       background-color: var(--bg);
       background-image:
-        linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 146, 60, 0.05) 100%),
-        radial-gradient(circle at 50% -10%, var(--bg-2), transparent 55%);
+        radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%),
+        radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%),
+        radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%),
+        radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
       background-attachment: fixed;
+    }
+    /* boot 完成前只藏分页水印(非 Hero);#app 保持可测几何,供 handoff / ST。
+       全屏遮罩靠 #preloader 不透明底,不再 visibility:hidden 整棵 #app
+       (非首页刷新时会干扰 pin/量测,导致开屏无法走完整逻辑)。 */
+    body[aria-busy="true"] main > .page {
+      visibility: hidden;
     }
     /* .grad-text 首帧兜底(neu.css 加载前的同值再声明,加载后由 neu.css 接管,值一致无冲突) */
     .grad-text {
@@ -157,10 +176,14 @@
       justify-content: center;
       gap: clamp(22px, 4.5vh, 36px);
       padding: var(--pad);
-      /* 背景与 neu.css body 完全一致(含 background-attachment: fixed):
-         preloader 显示/隐藏时背景视觉完全相同,硬切零跳变--
-         否则 preloader 的 radial-gradient 与 body 的另一套渐变硬切会闪一下。 */
-      background: transparent;
+      /* 不透明同款 body 底:挡住下方分区/社交;与 body 一致,is-done 硬切不闪 */
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 8% 12%, rgba(216, 164, 127, 0.18) 0%, transparent 32%),
+        radial-gradient(circle at 92% 8%, rgba(159, 180, 204, 0.16) 0%, transparent 28%),
+        radial-gradient(circle at 50% 95%, rgba(232, 220, 200, 0.18) 0%, transparent 30%),
+        radial-gradient(circle at 50% -10%, var(--bg-2), var(--bg) 55%);
+      background-attachment: fixed;
       animation: pl-stage-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
     @keyframes pl-stage-in {

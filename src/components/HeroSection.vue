@@ -90,7 +90,7 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
-import { dockGeo, flyP, flyEase, themeScrollLock } from '@/composables/brandDock'
+import { dockGeo, flyP, flyEase, themeScrollLock, bootDone } from '@/composables/brandDock'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -224,6 +224,12 @@ function flyBack() {
   if (socialRowEl && socialStageEl && socNat) {
     endSocChase()
     const s = socialRowEl
+    /* 入场级联途中回滚:停演清场,回 hero 由 reveal 常态接管 */
+    if (socEnter.timer) {
+      clearTimeout(socEnter.timer)
+      socEnter.timer = null
+    }
+    s.classList.remove('soc-enter-pending', 'soc-boot-enter')
     unbakeSocDock()
     socialStageEl.appendChild(s)
     s.style.position = ''
@@ -372,6 +378,30 @@ function endSocChase() {
   if (!socChasing) return
   socChasing = false
   gsap.ticker.remove(socChase)
+}
+
+/* ---------- 非首页深刷入场 ----------
+ * commitDock 把 row 提升到 body 后,父级 .hero-social 的 reveal 级联
+ * (80ms+ 后才加 .is-visible)再也罩不住它 → 停靠瞬间全形蹦出。
+ * commit 同帧挂 pending 隐藏(同一 JS 任务,无已绘制帧可闪),
+ * 待主题开关假层撤离后自开关方向右→左级联点亮:
+ * 每项 fade + 微升 + 微弹 + 轻旋正,与数字摊开同一家 spring 语言,幅度克制 */
+const socEnter = { timer: null, played: false }
+
+function scheduleSocialDockEntrance() {
+  if (REDUCED || socEnter.played || !socialRowEl) return
+  socEnter.played = true
+  const row = socialRowEl
+  row.classList.add('soc-enter-pending')
+  /* 主题开关假层在 finishBoot 收尾后 ~2 帧撤离;留一呼吸口再入场 */
+  socEnter.timer = setTimeout(() => {
+    socEnter.timer = null
+    row.classList.remove('soc-enter-pending')
+    row.classList.add('soc-boot-enter')
+    /* 末项(最左)延迟最长:0.5s + (n-1)·60ms,播完清场交还纯净 DOM */
+    const span = 500 + Math.max(0, row.children.length - 1) * 60 + 150
+    setTimeout(() => row.classList.remove('soc-boot-enter'), span)
+  }, 160)
 }
 
 /**
@@ -571,6 +601,8 @@ function build() {
         if (!socChasing && !socBaked) applySocState(self.progress)
       },
       onLeave: () => {
+        /* boot 锁顶期间若仍误触 progress=1,绝不能钉停靠,否则 handoff 飞向顶栏 */
+        if (!bootDone.value) return
         commitDock()
         driveExpansion(1) /* 到位后独立弹开(h1 已钉住,页面可继续滚) */
       },
@@ -625,21 +657,88 @@ function onResize() {
   }
 }
 
+/**
+ * 供 main.js 非首页 boot:量测 + 建 ST(仍在 scroll=0 / bootDone=false),
+ * 不 commit——防 handoff 被钉停靠短路。
+ */
+function prepareBrandDockForBoot() {
+  try {
+    if (!committed) measure()
+    if (!tl) build()
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+/** 停靠目标矩形(视口),供非首页 handoff 把 preloader 字飞向顶栏 */
+function getBrandDockTarget() {
+  if (!dockGeo.ready) return null
+  return {
+    left: dockGeo.left,
+    top: dockGeo.top,
+    width: dockGeo.w,
+    height: dockGeo.h,
+  }
+}
+
+/**
+ * 供 main.js 非首页 boot 收尾:还原 scroll 后刷新 ST,
+ * 若已过 pin 则 commit 停靠 + 展开(与 onLeave 同态)。
+ * 仅应在 bootDone 后调用——boot 中途 progress=1 会短路 handoff 大标题落地。
+ * opts.landTitle: 非首页路径保持 handoff-pending 至此处再亮,避免大标题闪一下再瞬移停靠。
+ */
+function syncBrandDockForBoot(opts = {}) {
+  try {
+    if (!nat && !committed) measure()
+    if (!tl) build()
+    ScrollTrigger.update()
+    ScrollTrigger.refresh()
+    if (st) {
+      flyP.value = st.progress
+      if (st.progress >= 1) {
+        if (!committed) {
+          commitDock()
+          /* 深刷落地:row 已脱离 reveal 级联,同帧藏起并排演入场 */
+          if (opts.landTitle) scheduleSocialDockEntrance()
+        }
+        driveExpansion(1)
+      } else if (!committed && !socChasing && !socBaked) {
+        applySocState(st.progress)
+      }
+    }
+    if (opts.landTitle) {
+      const el = titleRef.value
+      if (el) {
+        el.classList.remove('handoff-pending')
+        el.classList.add('is-landed')
+      }
+    }
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 onMounted(() => {
   socialStageEl = document.querySelector('.social-stage')
   socialRowEl = document.querySelector('.social-row')
   socialItemEls = socialRowEl ? Array.from(socialRowEl.children) : []
   applySocBg(0)
+  window.__prepareBrandDockForBoot = prepareBrandDockForBoot
+  window.__getBrandDockTarget = getBrandDockTarget
+  window.__syncBrandDockForBoot = syncBrandDockForBoot
   requestAnimationFrame(() => {
     measure()
     build()
+    /* boot 完成前绝不能按 progress=1 钉停靠,否则开屏飞向顶栏而非大标题 */
+    if (bootDone.value && st && st.progress >= 1) syncBrandDockForBoot({ landTitle: true })
   })
   window.addEventListener('resize', onResize)
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
-      measure()
+      if (!committed) measure()
       if (st) ScrollTrigger.refresh()
       else build()
+      if (bootDone.value && st && st.progress >= 1) syncBrandDockForBoot({ landTitle: true })
     })
   }
 })
@@ -686,8 +785,18 @@ onBeforeUnmount(() => {
   clearTimeout(navTimer)
   document.documentElement.style.overflow = ''
   window.removeEventListener('resize', onResize)
+  if (window.__syncBrandDockForBoot === syncBrandDockForBoot) {
+    delete window.__syncBrandDockForBoot
+  }
+  if (window.__prepareBrandDockForBoot === prepareBrandDockForBoot) {
+    delete window.__prepareBrandDockForBoot
+  }
+  if (window.__getBrandDockTarget === getBrandDockTarget) {
+    delete window.__getBrandDockTarget
+  }
   retractPending = false
   if (expandTween) expandTween.kill()
+  if (socEnter.timer) clearTimeout(socEnter.timer)
   endFlyChase()
   endSocChase()
   if (st) st.kill()
@@ -900,6 +1009,52 @@ onBeforeUnmount(() => {
 .legacy-link span {
   position: relative;
   z-index: 1;
+}
+
+/* ---------- 非首页深刷:停靠社交行入场 ----------
+   commit 同帧 pending 隐藏;入场自主题开关方向右→左级联,
+   微升 + 微弹 + 轻旋正,与数字摊开同一 spring 语系 */
+.social-row.soc-enter-pending {
+  opacity: 0;
+}
+.social-row.soc-boot-enter > * {
+  animation: soc-dock-in 0.5s cubic-bezier(0.34, 1.35, 0.42, 1) both;
+}
+.social-row.soc-boot-enter > :nth-last-child(1) {
+  animation-delay: 0ms;
+}
+.social-row.soc-boot-enter > :nth-last-child(2) {
+  animation-delay: 60ms;
+}
+.social-row.soc-boot-enter > :nth-last-child(3) {
+  animation-delay: 120ms;
+}
+.social-row.soc-boot-enter > :nth-last-child(4) {
+  animation-delay: 180ms;
+}
+.social-row.soc-boot-enter > :nth-last-child(5) {
+  animation-delay: 240ms;
+}
+.social-row.soc-boot-enter > :nth-last-child(6) {
+  animation-delay: 300ms;
+}
+@keyframes soc-dock-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(7px, 4px, 0) scale(0.55) rotate(-5deg);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .social-row.soc-boot-enter > * {
+    animation: none;
+  }
 }
 
 /* ---------- 旧版转场幕布 ---------- */
