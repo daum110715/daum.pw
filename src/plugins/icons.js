@@ -28,6 +28,11 @@ addIcon('lucide:mail', {
   height: lucide.height,
   ...lucide.icons.mail,
 })
+addIcon('lucide:rotate-ccw', {
+  width: lucide.width,
+  height: lucide.height,
+  ...lucide.icons['rotate-ccw'],
+})
 
 // phosphor: MIT, 更简约的线性图标
 addIcon('ph:sun-thin', {
