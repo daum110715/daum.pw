@@ -93,6 +93,12 @@ function go(n) {
   const el = sections[n - 1]
   if (!el) return
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  /* hero 被 GSAP pin 在 pin-spacer 里:scrollIntoView(block:'start') 对齐到
+     pin 终点(≈pinRange)而非文档顶,品牌字保持停靠回不去首页 → 直接滚 0 */
+  if (n === 1) {
+    window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' })
+    return
+  }
   el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
 }
 </script>
@@ -140,8 +146,5 @@ function go(n) {
 /* 新数字字形:平移滑入的载体(inline-block 才可 transform) */
 .pager-btn .d {
   display: inline-block;
-}
-.pager-btn:hover {
-  background: var(--accent-soft);
 }
 </style>
