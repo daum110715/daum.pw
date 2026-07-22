@@ -259,13 +259,13 @@ const SOCIAL_GAP = 12 /* 与 .social-row gap 一致;合并时用 x 收拢,不改
 const SOCIAL_MERGE_END = 0.55 /* p 到此合并完成;飞行全程 0→1 与之重叠 */
 const SOCIAL_BG_FADE_END = 0.5 /* 飞行进度到此背景消散完 */
 const SOCIAL_NAT_H = 48 /* hero 自然态按钮高 */
-const SOCIAL_DOCK_H = 32 /* 与 ThemeToggle .track 同高 */
-const SOCIAL_DOCK_TOP = 18 /* 与 .theme-floating top 同顶(窄屏 14 见 socDockTop) */
+const SOCIAL_DOCK_H = 40 /* 停靠钮高:略高于开关(track 32),图标更醒目 */
+const SOCIAL_DOCK_TOP = 14 /* 与主题开关垂直居中(开关 top18+高32 中心 34;40 高取 14,窄屏 10) */
 function socDockH() {
   return SOCIAL_DOCK_H
 }
 function socDockTop() {
-  return typeof window !== 'undefined' && window.innerWidth <= 640 ? 14 : SOCIAL_DOCK_TOP
+  return typeof window !== 'undefined' && window.innerWidth <= 640 ? 10 : SOCIAL_DOCK_TOP
 }
 
 let socialStageEl = null
@@ -293,26 +293,25 @@ function mergeAmount(p) {
   return 1 - (1 - t) * (1 - t)
 }
 
-/** 背景随飞行进度消散:p=0 实底 → p≥SOCIAL_BG_FADE_END 全消;回程反向凝聚 */
+/** 背景随飞行进度消散:p=0 实底 → p≥SOCIAL_BG_FADE_END 全消;回程反向凝聚。
+ *  消散只用 opacity + transform scale(均可合成,零重栅格);
+ *  不写 blur——动画化 blur 每帧重栅格 6 层 ::before,是滚动卡顿主因 */
 function applySocBg(p) {
   if (!socialItemEls.length) return
   const t = Math.min(1, Math.max(0, p / SOCIAL_BG_FADE_END))
   const bgO = (1 - t).toFixed(3)
-  const blur = `${(t * 10).toFixed(2)}px`
   const scale = (1 + t * 0.06).toFixed(4)
   const applyVars = (el) => {
     el.style.setProperty('--soc-bg-o', bgO)
-    el.style.setProperty('--soc-bg-blur', blur)
     el.style.setProperty('--soc-bg-scale', scale)
-    el.style.setProperty('--soc-fg-dim', '0')
   }
   if (socialRowEl) applyVars(socialRowEl)
   for (const el of socialItemEls) applyVars(el)
 }
 
-/** 飞行进度上的高度:自然 48 → 与主题开关齐平的 32 */
+/** 飞行进度上的高度:自然 48 → 与主题开关齐平的 32;返回缩放比 s 供宽度解析 */
 function applySocSize(p) {
-  if (!socialItemEls.length) return
+  if (!socialItemEls.length) return 1
   const h1 = SOCIAL_DOCK_H
   const h = SOCIAL_NAT_H + (h1 - SOCIAL_NAT_H) * p
   const s = h / SOCIAL_NAT_H
@@ -330,6 +329,7 @@ function applySocSize(p) {
     }
   }
   if (socialRowEl) socialRowEl.style.height = `${h.toFixed(2)}px`
+  return s
 }
 
 /**
@@ -343,11 +343,13 @@ function applySocState(p) {
   const m = mergeAmount(p)
   const n = socialItemEls.length
   const r = socRadius
-  applySocSize(p)
-  let sumW = 0
+  const s = applySocSize(p)
+  /* 钮宽之和走解析式:每项随 s 等比缩(与 applySocSize 同比例,
+     误差仅 legacy 固定 8px gap 的 (1-s) 倍,≤2.7px 不可见)。
+     逐帧读 offsetWidth 会与上方尺寸写入读写交错 → 强制同步重排,卡顿 */
+  const sumW = s * socNat.mergedW
   for (let i = 0; i < n; i++) {
     const el = socialItemEls[i]
-    sumW += el.offsetWidth
     el.style.transform = `translate3d(${(-i * SOCIAL_GAP * m).toFixed(2)}px,0,0)`
     el.style.borderRadius = `${r}px`
   }
@@ -386,7 +388,7 @@ function endSocChase() {
  * commit 同帧挂 pending 隐藏(同一 JS 任务,无已绘制帧可闪),
  * 待主题开关假层撤离后自开关方向右→左级联点亮:
  * 每项 fade + 微升 + 微弹 + 轻旋正,与数字摊开同一家 spring 语言,幅度克制 */
-const socEnter = { timer: null, played: false }
+const socEnter = { timer: null, played: false, armed: false }
 
 function scheduleSocialDockEntrance() {
   if (REDUCED || socEnter.played || !socialRowEl) return
@@ -554,6 +556,12 @@ function commitDock() {
     s.style.top = `${dockTop}px`
     s.style.zIndex = '60'
   }
+  /* 深刷入场:武装窗口内的 commit(boot 收尾,或还原 scroll 后 scroll
+     任务里抢先触发的 onLeave)同帧藏起并排演级联;正常滚动停靠不播 */
+  if (socEnter.armed) {
+    socEnter.armed = false
+    scheduleSocialDockEntrance()
+  }
 }
 
 function build() {
@@ -665,6 +673,9 @@ function prepareBrandDockForBoot() {
   try {
     if (!committed) measure()
     if (!tl) build()
+    /* 武装深刷入场:此后到 sync 收尾前,任何路径的 commit(含还原
+       scroll 后 scroll 任务里抢先触发的 onLeave)都排演社交行入场 */
+    if (!committed && !socEnter.played) socEnter.armed = true
   } catch (e) {
     /* ignore */
   }
@@ -696,16 +707,18 @@ function syncBrandDockForBoot(opts = {}) {
     if (st) {
       flyP.value = st.progress
       if (st.progress >= 1) {
-        if (!committed) {
-          commitDock()
-          /* 深刷落地:row 已脱离 reveal 级联,同帧藏起并排演入场 */
-          if (opts.landTitle) scheduleSocialDockEntrance()
-        }
+        /* commit 可能已由 onLeave 在上方 update/refresh 内同步完成;
+           入场排演统一走 commitDock 武装窗口 + 下方收尾兜底 */
+        if (!committed) commitDock()
         driveExpansion(1)
       } else if (!committed && !socChasing && !socBaked) {
         applySocState(st.progress)
       }
     }
+    /* 深刷收尾:撤防;若已停靠但入场未排(未经 prepare 武装的兜底
+       路径,如 4.5s fallback / bootCatch),此处补排 */
+    socEnter.armed = false
+    if (opts.landTitle && committed && !socEnter.played) scheduleSocialDockEntrance()
     if (opts.landTitle) {
       const el = titleRef.value
       if (el) {
@@ -919,7 +932,6 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-full);
   background: var(--bg-2);
   opacity: calc(var(--soc-bg-o) * var(--soc-merge));
-  filter: blur(var(--soc-bg-blur));
   transform: scale(var(--soc-bg-scale));
   transform-origin: center left;
   z-index: 0;
@@ -929,7 +941,6 @@ onBeforeUnmount(() => {
 .social-icon,
 .legacy-link {
   --soc-bg-o: 1;
-  --soc-bg-blur: 0px;
   --soc-bg-scale: 1;
   --soc-fg-dim: 0;
   position: relative;
@@ -947,7 +958,6 @@ onBeforeUnmount(() => {
   background: var(--bg-2);
   /* 合并进度 ↑ → 子项底 ↓,避免五块圆角硬拼 */
   opacity: calc(var(--soc-bg-o) * (1 - var(--soc-merge)));
-  filter: blur(var(--soc-bg-blur));
   transform: scale(var(--soc-bg-scale));
   transform-origin: center;
   z-index: -1;
