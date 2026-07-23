@@ -271,9 +271,13 @@ function socDockTop() {
 let socialStageEl = null
 let socialRowEl = null
 let socialItemEls = []
-let socNat = null /* 自然态 {left,docTop,natW,mergedW,dockMergedW} */
+let socNat = null /* 自然态 {left,viewTop,docTop,natW,mergedW,dockMergedW} */
 let socRadius = 18 /* px,自 --radius 读 */
-const socPose = { p: 1 }
+/* p:进度; _dx/_dy:上一帧写入的 translate; _hasTf:是否已有可反推 layout 的 transform
+   pin 期间 hero layoutTop 会缓漂(测得 ~4px),若 dy 死盯 measure 时 docTop,
+   p→1 时视觉落不到 dockTop,commit 瞬间下跳——用 visual−上一帧 translate 反推
+   当前 layout,每帧对准绝对视口目标,末帧与 bake 同位零跳变 */
+const socPose = { p: 1, _dx: 0, _dy: 0, _hasTf: false }
 let socChasing = false
 let socBaked = false /* commit 后已烘成 gap:0,勿再 applySocState */
 
@@ -335,7 +339,8 @@ function applySocSize(p) {
 /**
  * 按进度写合并 + 飞行。
  * 位移用「右缘锚定」:自然右缘 → 主题开关左缘 线性插值,再反推 left=right-packW。
- * 避免用最终 dock 宽算 left 导致缩宽/合并时右缘折线、最后一段像跳一下。
+ * 目标 left/top 是视口绝对坐标;transform = 目标 − 当前 layout 原点。
+ * layout 原点用「visual − 上一帧 translate」反推,抵消 pin 漂,p=1 必落 dock。
  * 进度与 ST 1:1(飞回 chase 除外),commit 前贴 p=1 再 bake,末段零跳变。
  */
 function applySocState(p) {
@@ -358,12 +363,27 @@ function applySocState(p) {
   socialRowEl.style.setProperty('--soc-merge', m.toFixed(4))
   socialRowEl.style.setProperty('--soc-pack-w', `${packW.toFixed(2)}px`)
   applySocBg(p)
+  /* 视口绝对目标:右缘锚主题开关左,顶锚 dockTop */
   const natRight = socNat.left + (socNat.natW || packW)
-  const right = natRight + (socDockRight() - natRight) * p
-  const left = right - packW
-  const dx = left - socNat.left
-  const dy = (socDockTop() - socNat.docTop) * p
+  const targetRight = natRight + (socDockRight() - natRight) * p
+  const targetLeft = targetRight - packW
+  const viewTop0 = socNat.viewTop != null ? socNat.viewTop : socNat.docTop
+  const targetTop = viewTop0 + (socDockTop() - viewTop0) * p
+  /* 当前 layout 原点(未计本行 translate):有历史 transform 则 visual 反推,
+     否则用 measure 快照。pin 漂多少这里就吃掉多少 */
+  let layoutLeft = socNat.left
+  let layoutTop = viewTop0
+  if (socPose._hasTf) {
+    const vr = socialRowEl.getBoundingClientRect()
+    layoutLeft = vr.left - socPose._dx
+    layoutTop = vr.top - socPose._dy
+  }
+  const dx = targetLeft - layoutLeft
+  const dy = targetTop - layoutTop
   socialRowEl.style.transform = `translate3d(${dx.toFixed(2)}px,${dy.toFixed(2)}px,0)`
+  socPose._dx = dx
+  socPose._dy = dy
+  socPose._hasTf = true
   socPose.p = p
 }
 
@@ -408,7 +428,8 @@ function scheduleSocialDockEntrance() {
 
 /**
  * 停靠烘焙:先 applySocState(1) 贴齐末帧,再清 transform 改 fixed。
- * 用 left(与 applySocState 右缘公式同值)而非只设 right,避免末段切换坐标系跳一下。
+ * 用实测 gap:0 后宽度反推 left,右缘严丝合缝贴主题开关间距,避免公式宽与
+ * 实宽差 1~2px 导致末段右缘轻跳。
  */
 function bakeSocDock() {
   if (!socialRowEl || !socNat) return
@@ -416,9 +437,7 @@ function bakeSocDock() {
   const r = socRadius
   const h = socDockH()
   const scale = h / SOCIAL_NAT_H
-  const dockW = socNat.dockMergedW || socNat.mergedW
-  const dockLeft = socDockRight() - dockW
-  /* 先画到 p=1 视觉位,再钉 fixed——与品牌 clearProps 同序,末段连贯 */
+  /* 先画到 p=1 视觉位(自校正后 = 绝对 dock),再钉 fixed——末段连贯 */
   socBaked = false
   applySocState(1)
   socialItemEls.forEach((el) => {
@@ -439,8 +458,13 @@ function bakeSocDock() {
   s.style.gap = '0'
   s.style.height = `${h}px`
   s.style.setProperty('--soc-merge', '1')
+  /* 实测烘焙宽(吃掉 legacy 固定 gap 等解析误差),右缘 = socDockRight */
+  void s.offsetWidth
+  const dockW = s.offsetWidth || socNat.dockMergedW || socNat.mergedW
   s.style.setProperty('--soc-pack-w', `${dockW}px`)
+  const dockLeft = socDockRight() - dockW
   socBaked = true
+  socPose._hasTf = false
   applySocBg(1)
   return { dockLeft, dockTop: socDockTop() }
 }
@@ -456,6 +480,10 @@ function unbakeSocDock() {
   socialRowEl.style.removeProperty('--soc-merge')
   socialRowEl.style.removeProperty('--soc-pack-w')
   socBaked = false
+  /* 回 stage 后 layout 原点回到自然态,下一帧 apply 从 socNat 重锚 */
+  socPose._hasTf = false
+  socPose._dx = 0
+  socPose._dy = 0
 }
 
 /* 自然态测量(hero 未被 pin/无 transform 时):一次测量,停靠几何纯按比例换算 */
@@ -489,11 +517,16 @@ function measure() {
     }, 0)
     socNat = {
       left: r.left,
+      viewTop: r.top /* 视口 Y,飞行绝对目标用 */,
       docTop: r.top + window.scrollY,
       natW: r.width /* 含 gap 的自然总宽,右缘锚定用 */,
       mergedW,
       dockMergedW,
     }
+    /* 重新量测后 transform 基准作废,下一帧从新原点锚 */
+    socPose._hasTf = false
+    socPose._dx = 0
+    socPose._dy = 0
     const rad = getComputedStyle(document.documentElement).getPropertyValue('--radius').trim()
     const parsed = parseFloat(rad)
     if (!Number.isNaN(parsed)) socRadius = parsed
