@@ -148,9 +148,13 @@ window.addEventListener('pageshow', (e) => {
 const reduced =
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const MOVE_MS = 780
+const MOVE_MS = 520
 /** 品牌字飞行:略带回弹感的 ease-out */
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+/** loading 背景 → 社交胶囊:收回成社交行整宽圆角长方形(同窗时长 = MOVE_MS);
+ *  再分裂成各图标底块:分裂时长与「从中间向外」级联 */
+const VEIL_SPLIT_MS = 253
+const VEIL_SPLIT_STAGGER_MS = 27
 /**
  * 进度条走满 + 变形统一 smooth 缓动(无折点)。
  * 走满由 runProgressFill 精确驱动,禁止中途 freeze 硬拉满。
@@ -244,6 +248,60 @@ function boxKeyframes(from, to) {
     height: r.height + 'px',
   })
   return [frame(from), frame(to)]
+}
+
+/** 读取 CSS 变量的计算色值(--bg/--bg-2 均为 hex,WAAPI backgroundColor 需要实色) */
+function cssColor(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+
+/**
+ * loading 背景归宿 · 分裂段:
+ * veil 已收回成社交行整宽的圆角长方形(与展开后同位同宽高)→
+ * 从中间向外级联分裂成各图标底块(假块 = --bg-2,与 ::before 同色)→
+ * 到位同窗点亮 .hero-social(真 ::before 底与假块同位同色,零跳变)并撤假块;
+ * 图标「淡入+微弹」由 HeroSection 的 is-visible 观察接管。
+ */
+async function splitVeilIntoSocial(veil, socialRowEl, heroSocialEl, barRect) {
+  const items = Array.from(socialRowEl.children)
+  if (!items.length) {
+    veil.remove()
+    return
+  }
+  const rects = items.map((el) => el.getBoundingClientRect())
+  const bg2 = cssColor('--bg-2', '#f5f0e8')
+  const radius = getComputedStyle(items[0]).borderRadius
+  const pieces = rects.map(() => {
+    const p = document.createElement('div')
+    p.className = 'boot-veil-piece'
+    p.style.cssText = `position:fixed;left:${barRect.left}px;top:${barRect.top}px;width:${barRect.width}px;height:${barRect.height}px;z-index:9998;pointer-events:none;background:${bg2};border-radius:${radius};`
+    document.body.appendChild(p)
+    return p
+  })
+  veil.remove()
+  await nextFrame()
+  const mid = (pieces.length - 1) / 2
+  const anims = pieces.map((p, i) =>
+    p.animate(boxKeyframes(barRect, rects[i]), {
+      duration: VEIL_SPLIT_MS,
+      delay: Math.abs(i - mid) * VEIL_SPLIT_STAGGER_MS,
+      easing: SMOOTH,
+      fill: 'forwards',
+    }),
+  )
+  await Promise.all(anims.map((a) => a.finished.catch(() => {})))
+  /* 接管同窗:点亮容器 + 撤假块同一 JS 任务,无已绘制帧可闪 */
+  if (heroSocialEl) {
+    heroSocialEl.style.transition = 'none'
+    heroSocialEl.classList.add('is-visible')
+  }
+  pieces.forEach((p) => p.remove())
+  /* 双帧后再还 transition:rAF 回调跑在同帧绘制前,单帧就还会让首帧
+     绘制时 inline none 已失效 → 容器吃 0.55s CSS 淡入,假块瞬没真底慢回 */
+  await nextFrame()
+  await nextFrame()
+  if (heroSocialEl) heroSocialEl.style.transition = ''
 }
 
 function pinFixedBox(node, rect, z) {
@@ -340,34 +398,41 @@ function syncInk() {
  * 返回 Promise:handoffResume 可在 commit 后再卸飞行克隆。
  */
 function restoreScrollAfterBoot(opts = {}) {
-  window.removeEventListener('scroll', clampBootScroll)
-  unlockBootScroll()
-  if (bootResumeY <= 1) {
-    if (opts.landTitle) {
-      const t = document.querySelector('.hero-title')
-      if (t) {
-        t.classList.remove('handoff-pending')
-        t.classList.add('is-landed')
-      }
-    }
-    return Promise.resolve()
+  const release = () => {
+    window.removeEventListener('scroll', clampBootScroll)
+    unlockBootScroll()
   }
-  // 'auto' 兼容性优于 'instant'(部分引擎不认 instant 会整段忽略)
-  window.scrollTo(0, bootResumeY)
-  // 双 rAF:等 pin-spacer / 布局随 scroll 稳定后再 refresh ST
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (typeof window.__syncBrandDockForBoot === 'function') {
-          window.__syncBrandDockForBoot({ landTitle: !!opts.landTitle })
-        } else if (opts.landTitle) {
-          const t = document.querySelector('.hero-title')
-          if (t) {
-            t.classList.remove('handoff-pending')
-            t.classList.add('is-landed')
-          }
+  /* veil 分裂/显现期间保持 boot 锁(hold),防 pin 移动社交行、假块落点漂移 */
+  const gate = opts.hold ? Promise.resolve(opts.hold) : Promise.resolve()
+  return gate.then(() => {
+    release()
+    if (bootResumeY <= 1) {
+      if (opts.landTitle) {
+        const t = document.querySelector('.hero-title')
+        if (t) {
+          t.classList.remove('handoff-pending')
+          t.classList.add('is-landed')
         }
-        resolve()
+      }
+      return
+    }
+    // 'auto' 兼容性优于 'instant'(部分引擎不认 instant 会整段忽略)
+    window.scrollTo(0, bootResumeY)
+    // 双 rAF:等 pin-spacer / 布局随 scroll 稳定后再 refresh ST
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (typeof window.__syncBrandDockForBoot === 'function') {
+            window.__syncBrandDockForBoot({ landTitle: !!opts.landTitle })
+          } else if (opts.landTitle) {
+            const t = document.querySelector('.hero-title')
+            if (t) {
+              t.classList.remove('handoff-pending')
+              t.classList.add('is-landed')
+            }
+          }
+          resolve()
+        })
       })
     })
   })
@@ -391,9 +456,11 @@ function finishBoot(heroTitle, opts = {}) {
   document
     .querySelectorAll('.reveal-after-boot:not(.is-visible):not(.theme-floating)')
     .forEach((node, i) => {
+      /* veil 路径:社交胶囊由假块分裂到位后手动点亮,不走通用级联 */
+      if (opts.skipSocial && node.classList.contains('hero-social')) return
       window.setTimeout(() => node.classList.add('is-visible'), 80 + i * 90)
     })
-  return restoreScrollAfterBoot({ landTitle: resume })
+  return restoreScrollAfterBoot({ landTitle: resume, hold: opts.hold })
 }
 /** 点亮主题切换按钮。instant:跳过 .reveal 过渡立即呈现——
     变形接管时假进度条正盖在同位,必须瞬亮后下一帧撤假条才零跳变 */
@@ -701,6 +768,80 @@ async function handoff() {
   }
 
   brand.style.visibility = 'hidden'
+
+  /* ---- B2. loading 背景归宿:克隆 preloader 底为 veil 接管硬切,
+     与品牌飞行同窗收回成社交行整宽的圆角长方形(与展开后同位同宽高);
+     落地后分裂成各图标底块(splitVeilIntoSocial)。
+     开屏三归宿同场:品牌字→标题,进度条→主题开关,背景→社交胶囊 ---- */
+  const heroSocialEl = document.querySelector('.hero-social')
+  const socialRowEl = document.querySelector('.social-row')
+  const rowRect = socialRowEl ? socialRowEl.getBoundingClientRect() : null
+  const canVeil = !!(heroSocialEl && rowRect && rowRect.width >= 40)
+  let veil = null
+  let veilP = Promise.resolve()
+  let barRect = null
+  if (canVeil) {
+    const pcs = getComputedStyle(el) /* preloader 背景(实色 + 径向渐变) */
+    const bg2 = cssColor('--bg-2', '#f5f0e8')
+    barRect = {
+      left: rowRect.left,
+      top: rowRect.top,
+      width: rowRect.width,
+      height: rowRect.height,
+    }
+    veil = document.createElement('div')
+    veil.className = 'boot-veil'
+    veil.style.cssText = `position:fixed;left:0;top:0;width:${window.innerWidth}px;height:${window.innerHeight}px;z-index:9998;pointer-events:none;overflow:hidden;`
+    veil.style.backgroundColor = pcs.backgroundColor
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:absolute;inset:0;'
+    overlay.style.backgroundImage = pcs.backgroundImage
+    veil.appendChild(overlay)
+    document.body.appendChild(veil)
+
+    const itemRadius = getComputedStyle(socialRowEl.firstElementChild).borderRadius
+    const veilFrom = {
+      left: '0px',
+      top: '0px',
+      width: window.innerWidth + 'px',
+      height: window.innerHeight + 'px',
+      borderRadius: '0px',
+    }
+    const veilTo = {
+      left: barRect.left + 'px',
+      top: barRect.top + 'px',
+      width: barRect.width + 'px',
+      height: barRect.height + 'px',
+      borderRadius: itemRadius,
+    }
+    const w = MOVE_MS
+    const aBox = veil.animate([veilFrom, veilTo], { duration: w, easing: EASE, fill: 'forwards' })
+    const aColor = veil.animate(
+      [{ backgroundColor: pcs.backgroundColor }, { backgroundColor: bg2 }],
+      { duration: w, easing: EASE, fill: 'forwards' },
+    )
+    const aVeil = overlay.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: w,
+      easing: 'ease',
+      fill: 'forwards',
+    })
+    veilP = Promise.all(
+      [aBox, aColor, aVeil].map((a) => a.finished.catch(() => {})),
+    ).then(() => {
+      /* 钉终态后卸 WAAPI,防残留 */
+      veil.style.left = veilTo.left
+      veil.style.top = veilTo.top
+      veil.style.width = veilTo.width
+      veil.style.height = veilTo.height
+      veil.style.borderRadius = veilTo.borderRadius
+      veil.style.backgroundColor = bg2
+      overlay.style.opacity = '0'
+      aBox.cancel()
+      aColor.cancel()
+      aVeil.cancel()
+    })
+  }
+
   el.style.visibility = 'hidden'
   el.style.pointerEvents = 'none'
   killPreloader(el)
@@ -730,7 +871,7 @@ async function handoff() {
       ? morphBarToToggle(prog, fill, trackEnd, thumbEnd, endBgs)
       : Promise.resolve()
 
-  await Promise.all([brandP, morphP])
+  await Promise.all([brandP, morphP, veilP])
 
   // ---- D. 字落地 + 真按钮接管(假层同位瞬亮后卸) ----
   clone.style.transition = 'none'
@@ -740,7 +881,12 @@ async function handoff() {
   await nextFrame()
   clone.remove()
 
-  finishBoot(heroTitle)
+  /* veil 落地成整行长方形 → 分裂成各图标底块 → 点亮社交胶囊(hold 延展滚动锁) */
+  const socialRevealP =
+    veil && barRect
+      ? splitVeilIntoSocial(veil, socialRowEl, heroSocialEl, barRect)
+      : Promise.resolve()
+  finishBoot(heroTitle, { skipSocial: !!veil, hold: socialRevealP })
 
   if (prog && fill && trackEnd) {
     revealToggle(true)
@@ -761,8 +907,10 @@ assertBrandSync()
 const bootFill = document.querySelector('.preloader__progress-fill')
 const bootCatch = () => {
   document.querySelectorAll('.pl-fly-svg').forEach((n) => n.remove())
+  document.querySelectorAll('.boot-veil, .boot-veil-piece').forEach((n) => n.remove())
   document.querySelectorAll('body > .preloader__progress, body > .preloader__progress-fill').forEach((n) => n.remove())
   killPreloader(document.getElementById('preloader'))
+  /* 不 skipSocial:veil 中断时社交胶囊回退通用级联,HeroSection 观察兜底播显现 */
   finishBoot(document.querySelector('.hero-title'))
   revealToggle()
 }

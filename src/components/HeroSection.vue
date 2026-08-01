@@ -426,6 +426,76 @@ function scheduleSocialDockEntrance() {
   }, 160)
 }
 
+/* ============================================================
+ * 首页社交胶囊图标显现 —— loading 背景收回成长方形、分裂成各图标底块后
+ * (main.js veil 序列),图标在各自胶囊内直接淡入。
+ * 触发 = .hero-social 被加 .is-visible(main.js 分裂完成后手动点亮;
+ * finishBoot 通用级联兜底);深刷(胶囊已提升 body)只还原,归 soc-dock-in。
+ * 播完清全部内联 + cancel WAAPI,DOM 交还纯净,dock/hover 零残留。
+ * ============================================================ */
+const SOC_FADE_MS = 213
+const SOC_FADE_STAGGER_MS = 40
+
+let socEnterParts = [] /* [{ targets:[svg|span] }] */
+let socEnterPlayed = false
+let socEnterObserver = null
+let heroSocialEl = null
+
+function prepareSocialEnter() {
+  if (REDUCED) return
+  for (const el of socialItemEls) {
+    const targets = []
+    const svg = el.querySelector('svg')
+    if (svg) targets.push(svg)
+    const span = el.querySelector('span')
+    if (span) targets.push(span)
+    if (!targets.length) continue
+    targets.forEach((t) => {
+      t.style.opacity = '0'
+    })
+    socEnterParts.push({ targets })
+  }
+}
+
+/* 还原纯净 DOM(跳过播放/播完收尾共用) */
+function cleanupSocialEnter() {
+  for (const it of socEnterParts) {
+    it.targets.forEach((t) => {
+      t.style.opacity = ''
+    })
+  }
+  socEnterParts = []
+}
+
+function playSocialEnter() {
+  if (socEnterPlayed || REDUCED) return
+  /* 深刷:胶囊已被 commit 提升到 body 停靠,入场归 soc-dock-in;
+     藏形必须还原,否则级联淡入后图标是空的 */
+  if (socBaked || (socialRowEl && socialStageEl && socialRowEl.parentNode !== socialStageEl)) {
+    cleanupSocialEnter()
+    return
+  }
+  socEnterPlayed = true
+  const anims = []
+  socEnterParts.forEach((it, i) => {
+    /* 左→右级联;同项内 svg 先、文字后 */
+    it.targets.forEach((t, j) => {
+      anims.push(
+        t.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: SOC_FADE_MS,
+          delay: i * SOC_FADE_STAGGER_MS + j * 33,
+          easing: 'ease',
+          fill: 'forwards',
+        }),
+      )
+    })
+  })
+  Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(() => {
+    cleanupSocialEnter()
+    anims.forEach((a) => a.cancel())
+  })
+}
+
 /**
  * 停靠烘焙:先 applySocState(1) 贴齐末帧,再清 transform 改 fixed。
  * 用实测 gap:0 后宽度反推 left,右缘严丝合缝贴主题开关间距,避免公式宽与
@@ -769,6 +839,22 @@ onMounted(() => {
   socialRowEl = document.querySelector('.social-row')
   socialItemEls = socialRowEl ? Array.from(socialRowEl.children) : []
   applySocBg(0)
+  prepareSocialEnter()
+  /* .is-visible = 入场信号(veil 分裂后手动点亮,或 finishBoot 级联兜底);
+     已亮(热更)则直接播 */
+  heroSocialEl = document.querySelector('.hero-social')
+  if (heroSocialEl && !REDUCED) {
+    if (heroSocialEl.classList.contains('is-visible')) playSocialEnter()
+    else {
+      socEnterObserver = new MutationObserver(() => {
+        if (!heroSocialEl.classList.contains('is-visible')) return
+        socEnterObserver.disconnect()
+        socEnterObserver = null
+        playSocialEnter()
+      })
+      socEnterObserver.observe(heroSocialEl, { attributes: true, attributeFilter: ['class'] })
+    }
+  }
   window.__prepareBrandDockForBoot = prepareBrandDockForBoot
   window.__getBrandDockTarget = getBrandDockTarget
   window.__syncBrandDockForBoot = syncBrandDockForBoot
@@ -829,6 +915,7 @@ function navigate() {
 
 onBeforeUnmount(() => {
   clearTimeout(navTimer)
+  if (socEnterObserver) socEnterObserver.disconnect()
   document.documentElement.style.overflow = ''
   window.removeEventListener('resize', onResize)
   if (window.__syncBrandDockForBoot === syncBrandDockForBoot) {
