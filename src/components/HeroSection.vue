@@ -35,6 +35,11 @@
       </div>
       <div class="hero-social reveal reveal-after-boot">
         <div class="social-stage">
+          <!-- 独立背景层:不随图标移动/缩放,只由 entrance 淡入,停靠时保持原位 -->
+          <div class="social-bg-row" aria-hidden="true">
+            <span v-for="s in social" :key="`bg-${s.url}`" class="social-bg" />
+            <span class="social-bg social-bg-wide" />
+          </div>
           <div class="social-row">
             <a
               v-for="s in social"
@@ -297,20 +302,22 @@ function mergeAmount(p) {
   return 1 - (1 - t) * (1 - t)
 }
 
+/** 底块驱动态:o=飞行消散(1→0), scale=消散微扩——仅用于 row::before 胶囊 */
+const socBgState = { o: 1, scale: 1 }
+
 /** 背景随飞行进度消散:p=0 实底 → p≥SOCIAL_BG_FADE_END 全消;回程反向凝聚。
- *  消散只用 opacity + transform scale(均可合成,零重栅格);
- *  不写 blur——动画化 blur 每帧重栅格 6 层 ::before,是滚动卡顿主因 */
+ *  消散只用 opacity + transform scale(均可合成,零重栅格); 子项白块已拆为独立
+ *  背景层,不跟随图标,故只驱动 row::before 合并胶囊。
+ *  不写 blur——动画化 blur 每帧重栅格 6 层底块,是滚动卡顿主因 */
 function applySocBg(p) {
   if (!socialItemEls.length) return
   const t = Math.min(1, Math.max(0, p / SOCIAL_BG_FADE_END))
-  const bgO = (1 - t).toFixed(3)
-  const scale = (1 + t * 0.06).toFixed(4)
-  const applyVars = (el) => {
-    el.style.setProperty('--soc-bg-o', bgO)
-    el.style.setProperty('--soc-bg-scale', scale)
+  socBgState.o = 1 - t
+  socBgState.scale = 1 + t * 0.06
+  if (socialRowEl) {
+    socialRowEl.style.setProperty('--soc-bg-o', socBgState.o.toFixed(3))
+    socialRowEl.style.setProperty('--soc-bg-scale', socBgState.scale.toFixed(4))
   }
-  if (socialRowEl) applyVars(socialRowEl)
-  for (const el of socialItemEls) applyVars(el)
 }
 
 /** 飞行进度上的高度:自然 48 → 与主题开关齐平的 32;返回缩放比 s 供宽度解析 */
@@ -1025,19 +1032,28 @@ onBeforeUnmount(() => {
 }
 .social-stage {
   position: relative;
-  display: inline-block;
-  width: fit-content;
+  display: inline-flex;
+  align-items: center;
 }
+.social-bg-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+/* 图标层:绝对定位盖在背景层之上,自身可飞入/停靠;背景层不跟随 */
 .social-row {
   --soc-merge: 0;
   --soc-pack-w: 100%;
   --soc-bg-o: 1;
   --soc-bg-blur: 0px;
   --soc-bg-scale: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
   display: flex;
   align-items: center;
   gap: 12px; /* 与 SOCIAL_GAP 同步;合并用子项 translateX,不动画此值 */
-  position: relative;
   z-index: 1;
   will-change: transform;
 }
@@ -1057,32 +1073,24 @@ onBeforeUnmount(() => {
   z-index: 0;
   pointer-events: none;
 }
-/* 子项底:自然态各自一块;合并时淡出,交给 row 胶囊 */
 .social-icon,
 .legacy-link {
-  --soc-bg-o: 1;
-  --soc-bg-scale: 1;
   --soc-fg-dim: 0;
   position: relative;
   z-index: 1;
-  isolation: isolate;
   background: transparent !important;
   color: color-mix(in srgb, var(--text) calc((1 - var(--soc-fg-dim)) * 100%), var(--text-dim));
 }
-.social-icon::before,
-.legacy-link::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+.social-bg {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
   background: var(--bg-2);
-  /* 合并进度 ↑ → 子项底 ↓,避免五块圆角硬拼 */
-  opacity: calc(var(--soc-bg-o) * (1 - var(--soc-merge)));
-  transform: scale(var(--soc-bg-scale));
-  transform-origin: center;
-  z-index: -1;
-  pointer-events: none;
+  flex: 0 0 auto;
   transition: background var(--dur) var(--ease);
+}
+.social-bg-wide {
+  width: 94px; /* 与 legacy-link 同宽 */
 }
 .social-icon {
   display: inline-flex;
@@ -1098,9 +1106,6 @@ onBeforeUnmount(() => {
 .social-icon:hover {
   color: var(--accent);
 }
-.social-icon:hover::before {
-  background: var(--accent-soft);
-}
 .social-icon :deep(svg) {
   width: var(--soc-icon, 22px);
   height: var(--soc-icon, 22px);
@@ -1112,9 +1117,11 @@ onBeforeUnmount(() => {
 .legacy-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  width: 94px;
   height: 48px;
-  padding: 0 18px;
+  padding: 0;
   border-radius: var(--radius);
   font-size: 15px;
   font-weight: 600;
@@ -1125,9 +1132,6 @@ onBeforeUnmount(() => {
 }
 .legacy-link:hover {
   color: var(--accent);
-}
-.legacy-link:hover::before {
-  background: var(--accent-soft);
 }
 .legacy-link :deep(svg) {
   width: var(--soc-icon, 20px);

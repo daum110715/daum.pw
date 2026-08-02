@@ -290,18 +290,42 @@ async function splitVeilIntoSocial(veil, socialRowEl, heroSocialEl, barRect) {
       fill: 'forwards',
     }),
   )
-  await Promise.all(anims.map((a) => a.finished.catch(() => {})))
-  /* 接管同窗:点亮容器 + 撤假块同一 JS 任务,无已绘制帧可闪 */
-  if (heroSocialEl) {
-    heroSocialEl.style.transition = 'none'
-    heroSocialEl.classList.add('is-visible')
+  /* 接管同窗:点亮容器 + 撤假块同一 JS 任务,无已绘制帧可闪。
+     假块是 fixed 独立层——残留后不随图标移动也不消散;
+     接管与动画 settle 解耦:Promise 挂起/异常时超时强制接管,任何路径不留假块 */
+  let took = false
+  const takeover = () => {
+    if (took) return
+    took = true
+    if (heroSocialEl) {
+      heroSocialEl.style.transition = 'none'
+      heroSocialEl.classList.add('is-visible')
+    }
+    pieces.forEach((p) => p.remove())
   }
-  pieces.forEach((p) => p.remove())
-  /* 双帧后再还 transition:rAF 回调跑在同帧绘制前,单帧就还会让首帧
-     绘制时 inline none 已失效 → 容器吃 0.55s CSS 淡入,假块瞬没真底慢回 */
-  await nextFrame()
-  await nextFrame()
-  if (heroSocialEl) heroSocialEl.style.transition = ''
+  const restoreTransition = () => {
+    /* 双帧后再还 transition:rAF 回调跑在同帧绘制前,单帧就还会让首帧
+       绘制时 inline none 已失效 → 容器吃 0.55s CSS 淡入,假块瞬没真底慢回 */
+    nextFrame().then(() =>
+      nextFrame().then(() => {
+        if (heroSocialEl) heroSocialEl.style.transition = ''
+      }),
+    )
+  }
+  const failsafe = window.setTimeout(
+    () => {
+      takeover()
+      restoreTransition()
+    },
+    VEIL_SPLIT_MS + (pieces.length - 1) * VEIL_SPLIT_STAGGER_MS + 600,
+  )
+  try {
+    await Promise.all(anims.map((a) => a.finished.catch(() => {})))
+  } finally {
+    window.clearTimeout(failsafe)
+    takeover()
+  }
+  restoreTransition()
 }
 
 function pinFixedBox(node, rect, z) {
