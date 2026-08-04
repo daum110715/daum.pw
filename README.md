@@ -12,6 +12,10 @@ npm run dev -- --port 3000
 npm run build
 ```
 
+## 贡献
+
+代码规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 许可证
 
 AGPL-3.0
