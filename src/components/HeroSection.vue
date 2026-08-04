@@ -96,6 +96,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { social } from '@/data/social'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
 import { dockGeo, flyP, flyEase, themeScrollLock, bootDone } from '@/composables/brandDock'
+import { initBeamMerge } from '@/composables/useBeamMerge'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -285,6 +286,7 @@ let socRadius = 18 /* px,自 --radius 读 */
 const socPose = { p: 1, _dx: 0, _dy: 0, _hasTf: false }
 let socChasing = false
 let socBaked = false /* commit 后已烘成 gap:0,勿再 applySocState */
+let destroyBeamMerge = null /* useBeamMerge 卸载句柄 */
 
 /** 停靠时胶囊右缘(主题开关左) */
 function socDockRight() {
@@ -845,6 +847,14 @@ onMounted(() => {
   socialStageEl = document.querySelector('.social-stage')
   socialRowEl = document.querySelector('.social-row')
   socialItemEls = socialRowEl ? Array.from(socialRowEl.children) : []
+  /* 横梁合并(底块→bar,与图标飞行同窗可逆):逻辑在 composable,此处仅接线 */
+  destroyBeamMerge = initBeamMerge({
+    bgRowEl: socialStageEl && socialStageEl.querySelector('.social-bg-row'),
+    gap: SOCIAL_GAP,
+    mergeEnd: SOCIAL_MERGE_END,
+    rangeVh: RANGE_VH,
+    reduced: REDUCED,
+  })
   applySocBg(0)
   prepareSocialEnter()
   /* .is-visible = 入场信号(veil 分裂后手动点亮,或 finishBoot 级联兜底);
@@ -922,6 +932,7 @@ function navigate() {
 
 onBeforeUnmount(() => {
   clearTimeout(navTimer)
+  if (destroyBeamMerge) destroyBeamMerge()
   if (socEnterObserver) socEnterObserver.disconnect()
   document.documentElement.style.overflow = ''
   window.removeEventListener('resize', onResize)

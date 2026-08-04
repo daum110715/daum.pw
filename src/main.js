@@ -270,7 +270,7 @@ async function splitVeilIntoSocial(veil, socialRowEl, heroSocialEl, barRect) {
     return
   }
   const rects = items.map((el) => el.getBoundingClientRect())
-  const bg2 = cssColor('--bg-2', '#f5f0e8')
+  const bg2 = cssColor('--bg-2', '#ffffff')
   const radius = getComputedStyle(items[0]).borderRadius
   const pieces = rects.map(() => {
     const p = document.createElement('div')
@@ -793,9 +793,10 @@ async function handoff() {
 
   brand.style.visibility = 'hidden'
 
-  /* ---- B2. loading 背景归宿:克隆 preloader 底为 veil 接管硬切,
-     与品牌飞行同窗收回成社交行整宽的圆角长方形(与展开后同位同宽高);
-     落地后分裂成各图标底块(splitVeilIntoSocial)。
+  /* ---- B2. loading 背景归宿:preloader 底即 --bg-2 实色,veil 直接以同色
+     起幕接管硬切,与品牌飞行同窗收回成社交行整宽的圆角长方形(与展开后
+     同位同宽高);落地后分裂成各图标底块(splitVeilIntoSocial),全程同色
+     无需颜色/渐变过渡。
      开屏三归宿同场:品牌字→标题,进度条→主题开关,背景→社交胶囊 ---- */
   const heroSocialEl = document.querySelector('.hero-social')
   const socialRowEl = document.querySelector('.social-row')
@@ -805,8 +806,7 @@ async function handoff() {
   let veilP = Promise.resolve()
   let barRect = null
   if (canVeil) {
-    const pcs = getComputedStyle(el) /* preloader 背景(实色 + 径向渐变) */
-    const bg2 = cssColor('--bg-2', '#f5f0e8')
+    const bg2 = cssColor('--bg-2', '#ffffff')
     barRect = {
       left: rowRect.left,
       top: rowRect.top,
@@ -815,12 +815,7 @@ async function handoff() {
     }
     veil = document.createElement('div')
     veil.className = 'boot-veil'
-    veil.style.cssText = `position:fixed;left:0;top:0;width:${window.innerWidth}px;height:${window.innerHeight}px;z-index:9998;pointer-events:none;overflow:hidden;`
-    veil.style.backgroundColor = pcs.backgroundColor
-    const overlay = document.createElement('div')
-    overlay.style.cssText = 'position:absolute;inset:0;'
-    overlay.style.backgroundImage = pcs.backgroundImage
-    veil.appendChild(overlay)
+    veil.style.cssText = `position:fixed;left:0;top:0;width:${window.innerWidth}px;height:${window.innerHeight}px;z-index:9998;pointer-events:none;overflow:hidden;background:${bg2};`
     document.body.appendChild(veil)
 
     const itemRadius = getComputedStyle(socialRowEl.firstElementChild).borderRadius
@@ -838,31 +833,19 @@ async function handoff() {
       height: barRect.height + 'px',
       borderRadius: itemRadius,
     }
-    const w = MOVE_MS
-    const aBox = veil.animate([veilFrom, veilTo], { duration: w, easing: EASE, fill: 'forwards' })
-    const aColor = veil.animate(
-      [{ backgroundColor: pcs.backgroundColor }, { backgroundColor: bg2 }],
-      { duration: w, easing: EASE, fill: 'forwards' },
-    )
-    const aVeil = overlay.animate([{ opacity: 1 }, { opacity: 0 }], {
-      duration: w,
-      easing: 'ease',
+    const aBox = veil.animate([veilFrom, veilTo], {
+      duration: MOVE_MS,
+      easing: EASE,
       fill: 'forwards',
     })
-    veilP = Promise.all(
-      [aBox, aColor, aVeil].map((a) => a.finished.catch(() => {})),
-    ).then(() => {
+    veilP = aBox.finished.catch(() => {}).then(() => {
       /* 钉终态后卸 WAAPI,防残留 */
       veil.style.left = veilTo.left
       veil.style.top = veilTo.top
       veil.style.width = veilTo.width
       veil.style.height = veilTo.height
       veil.style.borderRadius = veilTo.borderRadius
-      veil.style.backgroundColor = bg2
-      overlay.style.opacity = '0'
       aBox.cancel()
-      aColor.cancel()
-      aVeil.cancel()
     })
   }
 
