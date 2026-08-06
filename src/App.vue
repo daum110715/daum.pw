@@ -3,13 +3,15 @@
   <PagePager />
   <main>
     <HeroSection />
-    <PageSection v-for="n in 8" :key="n" :index="n + 1" />
+    <BrandSection />
+    <PageSection v-for="n in 7" :key="n" :index="n + 2" />
   </main>
 </template>
 
 <script setup>
 import ThemeToggle from './components/ThemeToggle.vue'
 import HeroSection from './components/HeroSection.vue'
+import BrandSection from './components/BrandSection.vue'
 import PageSection from './components/PageSection.vue'
 import PagePager from './components/PagePager.vue'
 import { useReveal } from '@/composables/useReveal'
