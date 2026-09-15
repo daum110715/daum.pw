@@ -6,7 +6,8 @@
   "description": "daum12569 的个人主页",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json && vue-tsc --noEmit -p tsconfig.node.json",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -18,7 +19,10 @@
     "vue": "^3.4.21"
   },
   "devDependencies": {
+    "@types/node": "^26.5.1",
     "@vitejs/plugin-vue": "^5.0.4",
-    "vite": "^5.2.0"
+    "typescript": "^5.9.3",
+    "vite": "^5.2.0",
+    "vue-tsc": "^3.3.11"
   }
 }

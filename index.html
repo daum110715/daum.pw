@@ -26,7 +26,7 @@
   <script>
     // 非首页刷新:必须在首帧前关掉自动滚位。否则浏览器在 Vue/ST 就绪前把
     // scrollY 拉到分区中段 → Hero 离屏、ScrollTrigger 直接 progress=1 钉停靠,
-    // 开屏 handoff 飞向顶栏而非大标题,完整入场被短路。main.js 会在 boot 结束后
+    // 开屏 handoff 飞向顶栏而非大标题,完整入场被短路。main.ts 会在 boot 结束后
     // 按 sessionStorage 的 daum-scroll-y 还原。
     (function () {
       try {
@@ -37,7 +37,7 @@
   <script>
     // 旧版回流转场:带 ?from=legacy 或本次会话去过旧版(sessionStorage 标记),
     // 首帧前挂上到达幕布标记,body::after 以新版 --bg 满幅盖住,
-    // main.js 在 boot 早期触发虹膜展开,与旧版离场虹膜同语言同节奏
+    // main.ts 在 boot 早期触发虹膜展开,与旧版离场虹膜同语言同节奏
     (function () {
       try {
         if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -161,7 +161,7 @@
     }
 
     /* ---------- Preloader ----------
-       流程(main.js):
+       流程(main.ts):
        1) Outfit 800 轮廓 path 逐字描边+填实(实色 --brand-ink)
        2) 克隆描边 SVG 飞到 Hero 同源 SVG 位置,落地亮真身后卸克隆
        3) 进度条变形为主题开关,背景(--bg-2)收回并分裂为社交胶囊底块
@@ -203,7 +203,7 @@
       width: auto;
       overflow: visible;
     }
-    /* 加载进度条:loading 期间细轨;main.js 变形时再胀成 ThemeToggle 32px 轨 + thumb */
+    /* 加载进度条:loading 期间细轨;main.ts 变形时再胀成 ThemeToggle 32px 轨 + thumb */
     .preloader__progress {
       width: clamp(150px, 34vw, 210px);
       height: 6px;
@@ -217,7 +217,7 @@
       height: 100%;
       border-radius: var(--radius-full);
       background: var(--accent);
-      /* 宽度由 main.js runProgressFill 驱动(与描边同窗,走满后无跳变再停顿) */
+      /* 宽度由 main.ts runProgressFill 驱动(与描边同窗,走满后无跳变再停顿) */
     }
     /* 描边 → 填实:同一实色,填完去掉描边 */
     .pl-char-path {
@@ -296,7 +296,7 @@
 
   <div id="app"></div>
   <noscript>本站需要 JavaScript 运行,请启用后访问 daum.pw。</noscript>
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/main.ts"></script>
   <script>
     // 兜底:即便模块加载失败,4.5s 后也强制收尾,防止卡死
     (function () {
@@ -311,7 +311,7 @@
           el.setAttribute('aria-hidden', 'true');
           if (el.parentNode) el.parentNode.removeChild(el);
         }
-        // 揭示 Hero + 级联 reveal:优先用 main.js 挂载的共享收尾;
+        // 揭示 Hero + 级联 reveal:优先用 main.ts 挂载的共享收尾;
         // 模块加载失败时手动等价(否则 Hero 永久 opacity:0)
         if (typeof window.__finishBoot === 'function') {
           window.__finishBoot();

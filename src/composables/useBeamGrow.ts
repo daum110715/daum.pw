@@ -48,11 +48,11 @@ const SET_SOLID = 0.97 /* 真卡阶跃点(beam 仍全盖,同色不可见) */
 const GHOST_OUT = [0.975, 1] /* beam 淡出揭示窗(末段,与真卡收敛零错位) */
 const BORN = 0.97 /* 卡内 SVG 淡入阈值 */
 
-const clamp01 = (t) => Math.min(1, Math.max(0, t))
-const easeOut = (t) => 1 - (1 - t) * (1 - t) /* 与 mergeAmount 同式 power2.out */
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
+const easeOut = (t: number) => 1 - (1 - t) * (1 - t) /* 与 mergeAmount 同式 power2.out */
 
-const lerp = (a, b, t) => a + (b - a) * t
-const lerpRect = (a, b, t) => ({
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+const lerpRect = (a: BoxRect, b: BoxRect, t: number): BoxRect => ({
   left: lerp(a.left, b.left, t),
   top: lerp(a.top, b.top, t),
   width: lerp(a.width, b.width, t),
@@ -61,22 +61,31 @@ const lerpRect = (a, b, t) => ({
 
 /* beam 阴影 = 方卡同款双侧 neu 阴影,alpha 随膨胀/淡出缩放;
    color-mix 派生透明色,不写第三份近似色,深浅主题自适应 */
-const beamShadow = (a) =>
+const beamShadow = (a: number) =>
   a <= 0
     ? 'none'
     : `8px 8px 20px color-mix(in srgb, var(--shadow-dark) ${(a * 100).toFixed(1)}%, transparent),` +
       `-8px -8px 20px color-mix(in srgb, var(--shadow-light) ${(a * 100).toFixed(1)}%, transparent)`
 
+export interface BeamGrowOptions {
+  /** 方卡真身(文档流内) */
+  cardEl?: HTMLElement | null
+  /** 第二页 section(挂 .is-born) */
+  sectionEl?: HTMLElement | null
+  /** ScrollTrigger trigger(默认 '#page-2') */
+  trigger?: string
+  /** prefers-reduced-motion:直显兜底 */
+  reduced?: boolean
+}
+
 /**
- * @param {object} opts
- * @param {HTMLElement} opts.cardEl   方卡真身(文档流内)
- * @param {HTMLElement} opts.sectionEl 第二页 section(挂 .is-born)
- * @param {string}  [opts.trigger]  ScrollTrigger trigger(默认 '#page-2')
- * @param {boolean} [opts.reduced]  prefers-reduced-motion:直显兜底
- * @returns {() => void} destroy
+ * @returns destroy
  */
-export function initBeamGrow(opts = {}) {
-  const { cardEl, sectionEl, trigger = '#page-2', reduced = false } = opts
+export function initBeamGrow(opts: BeamGrowOptions = {}): () => void {
+  const cardEl = opts.cardEl
+  const sectionEl = opts.sectionEl
+  const trigger = opts.trigger ?? '#page-2'
+  const reduced = opts.reduced ?? false
   if (!cardEl || !sectionEl) return () => {}
   gsap.registerPlugin(ScrollTrigger)
 
@@ -90,11 +99,11 @@ export function initBeamGrow(opts = {}) {
 
   /* 接管零点:bake 瞬间的 ST 进度(此前 apply 早退,进度空攒);
      以其后局部进度 pg 驱动,展开起点与合并态严丝合缝 */
-  let p0 = null
+  let p0: number | null = null
 
-  function apply(p) {
+  function apply(p: number) {
     /* beam 未钉位(还在 hero 段):等 hero p=1 bake 后接管 */
-    if (!beamDock.baked || !beamDock.el || !beamDock.rect) return
+    if (!beamDock.baked || !beamDock.el || !beamDock.rect || !cardEl || !sectionEl) return
     const beam = beamDock.el
     const r0 = beamDock.rect
     const rCard = cardEl.getBoundingClientRect()

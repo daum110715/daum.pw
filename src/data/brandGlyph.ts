@@ -4,7 +4,7 @@
  *
  * ★ 修改任一 path 必须同步 index.html 内联 preloader SVG:
  *   首帧不能等 ESM,故 index.html 内联一份静态副本。
- *   main.js 启动时有 dev assert 比对二者,不一致会 console.error。
+ *   main.ts 启动时有 dev assert 比对二者,不一致会 console.error。
  *   两份不同源会导致开屏飞行落地错位。
  * ============================================================ */
 export const BRAND_TEXT = 'daum12569'
@@ -15,7 +15,11 @@ export const BRAND_GROUP_TRANSFORM = 'translate(0 1000) scale(1 -1)'
  * 9 条字符 path(d=a/u/m/1/2/5/6/9 的字形轮廓,tx=字符内 translate)。
  * 顺序与 index.html preloader SVG 的 --i:0..8 一致。
  */
-export const BRAND_PATHS = [
+export interface BrandGlyphPath {
+  tx: number
+  d: string
+}
+export const BRAND_PATHS: BrandGlyphPath[] = [
   {
     "tx": 0,
     "d": "M261 -10Q190 -10 135.5 23Q81 56 50.5 113.5Q20 171 20 245Q20 318 50.5 376Q81 434 135 466.5Q189 499 261 499Q307 499 347 482.5Q387 466 414 436Q441 406 446 368L446 129Q441 90 414 58.5Q387 27 347 8.5Q307 -10 261 -10ZM293 145Q321 145 342 158Q363 171 375 193Q387 215 387 245Q387 274 375.5 296Q364 318 342.5 331Q321 344 293 344Q265 344 243.5 331Q222 318 209 295.5Q196 273 196 245Q196 216 208.5 193.5Q221 171 243 158Q265 145 293 145ZM553 0L381 0L381 132L406 250L378 369L378 729L553 729Z"

@@ -21,28 +21,44 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 const BEAM_Z = 40 /* 钉视口层级:常规分区(z1/2)之上,pager(z50)/hero(z55)之下 */
 const HIDE_START = 0.6 /* m 过此点原块开始淡出,m=1 时只留横梁独自成形 */
 
+export interface BeamMergeOptions {
+  /** .social-bg-row(5 底块的容器) */
+  bgRowEl?: HTMLElement | null
+  /** 与 SOCIAL_GAP 同步 */
+  gap?: number
+  /** 与 SOCIAL_MERGE_END 同步 */
+  mergeEnd?: number
+  /** 与 RANGE_VH 同步(pin 行程) */
+  rangeVh?: number
+  /** prefers-reduced-motion:整体跳过 */
+  reduced?: boolean
+}
+
 /** 横梁状态:下一页变形接管的入口(el=横梁 DOM,baked=已钉视口,rect=钉位) */
-export const beamDock = {
+export const beamDock: {
+  el: HTMLElement | null
+  baked: boolean
+  /** 视口坐标 */
+  rect: BoxRect | null
+} = {
   el: null,
   baked: false,
-  rect: null /* {left,top,width,height} 视口坐标 */,
+  rect: null,
 }
 
 /**
- * @param {object} opts
- * @param {HTMLElement} opts.bgRowEl  .social-bg-row(5 底块的容器)
- * @param {number} opts.gap           与 SOCIAL_GAP 同步
- * @param {number} opts.mergeEnd      与 SOCIAL_MERGE_END 同步
- * @param {number} opts.rangeVh       与 RANGE_VH 同步(pin 行程)
- * @param {boolean} opts.reduced      prefers-reduced-motion:整体跳过
- * @returns {() => void} destroy:组件卸载时调用
+ * @returns destroy:组件卸载时调用
  */
-export function initBeamMerge(opts = {}) {
-  const { bgRowEl, gap = 12, mergeEnd = 0.55, rangeVh = 0.4, reduced = false } = opts
+export function initBeamMerge(opts: BeamMergeOptions = {}): () => void {
+  const bgRowEl = opts.bgRowEl
+  const gap = opts.gap ?? 12
+  const mergeEnd = opts.mergeEnd ?? 0.55
+  const rangeVh = opts.rangeVh ?? 0.4
+  const reduced = opts.reduced ?? false
   if (!bgRowEl || reduced) return () => {}
   gsap.registerPlugin(ScrollTrigger)
 
-  const blocks = Array.from(bgRowEl.children)
+  const blocks = Array.from(bgRowEl.children) as HTMLElement[]
   const n = blocks.length
   if (!n) return () => {}
 
@@ -62,7 +78,7 @@ export function initBeamMerge(opts = {}) {
   })
 
   let natW = 0
-  let pinRect = null /* 横梁钉住位的视口矩形 */
+  let pinRect: BoxRect | null = null /* 横梁钉住位的视口矩形 */
   let baked = false
 
   /* 钉住位 = 文档位(pin 起于 scroll 0):r.top+scrollY 与当前滚位无关,
@@ -79,13 +95,13 @@ export function initBeamMerge(opts = {}) {
   }
 
   /* 合并量:与图标 mergeAmount 同式同窗,视觉语言一致 */
-  const mergeAmount = (p) => {
+  const mergeAmount = (p: number) => {
     const t = Math.min(1, Math.max(0, p / mergeEnd))
     return 1 - (1 - t) * (1 - t)
   }
 
   function bake() {
-    if (baked) return
+    if (baked || !pinRect) return
     baked = true
     const r = pinRect
     document.body.appendChild(beam)
@@ -98,7 +114,7 @@ export function initBeamMerge(opts = {}) {
   }
 
   function unbake() {
-    if (!baked) return
+    if (!baked || !bgRowEl) return
     baked = false
     beam.style.cssText = FLOW_CSS
     bgRowEl.insertBefore(beam, bgRowEl.firstChild)
@@ -107,7 +123,7 @@ export function initBeamMerge(opts = {}) {
     beamDock.rect = null
   }
 
-  function apply(p) {
+  function apply(p: number) {
     /* p=1 时 hero 仍钉住:文档流位即钉住位,同帧换 fixed 零跳变 */
     if (p >= 1) {
       bake()

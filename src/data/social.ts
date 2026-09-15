@@ -1,5 +1,10 @@
 // 社交链接(key 用于图标映射,name 用于 aria-label/tooltip)
-export const social = [
+export interface SocialLink {
+  key: string
+  name: string
+  url: string
+}
+export const social: SocialLink[] = [
   { key: 'bilibili', name: 'Bilibili', url: 'https://space.bilibili.com/3546731002202994' },
   { key: 'email', name: 'Email', url: 'mailto:daum12569@gmail.com' },
   { key: 'github', name: 'GitHub · da-um', url: 'https://github.com/da-um' },

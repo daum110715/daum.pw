@@ -6,12 +6,12 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  index: { type: Number, required: true },
-})
+const props = defineProps<{
+  index: number
+}>()
 
 const label = computed(() => String(props.index).padStart(2, '0'))
 </script>

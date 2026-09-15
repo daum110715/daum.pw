@@ -11,7 +11,7 @@
   </button>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -23,8 +23,8 @@ onMounted(() => {
 })
 
 let curtainBusy = false
-let activeVt = null
-let curtainCleanup = null
+let activeVt: ViewTransition | null = null
+let curtainCleanup: (() => void) | null = null
 
 // 切后台时 VT 动画暂停、伪元素快照滞留会盖住真按钮(返回后按钮"消失");
 // 隐藏瞬间跳到终态并立即清理,忙锁绝不带到前台
@@ -87,14 +87,14 @@ function toggleWithTransition() {
    爬行);底部滞后量先 smoothstep 涨到 14%,t=0.5 释放后按临界阻尼曲线
    冲向 -8(底部靠惯性甩过顶部,帘边离场瞬间向前过摆);弧形边 21 点
    采样,滞后量按 (y/100)² 分布——上挺下荡。可见区 = 前缘以左(pullRight) */
-function bakeCurtainKeyframes(pullRight) {
+function bakeCurtainKeyframes(pullRight: boolean) {
   const FRAMES = 24
-  const ys = []
+  const ys: number[] = []
   for (let y = 0; y <= 100; y += 5) ys.push(y)
-  const smoothstep = (u) => u * u * (3 - 2 * u)
-  const easeInOutCubic = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2)
-  const topAt = (t) => 118 * easeInOutCubic(t)
-  const lagAt = (t) => {
+  const smoothstep = (u: number) => u * u * (3 - 2 * u)
+  const easeInOutCubic = (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2)
+  const topAt = (t: number) => 118 * easeInOutCubic(t)
+  const lagAt = (t: number) => {
     if (t < 0.5) return 14 * smoothstep(t / 0.5)
     const u = (t - 0.5) / 0.5
     return -8 + 22 * (1 + 5 * u) * Math.exp(-5 * u)
@@ -126,7 +126,7 @@ function bakeCurtainKeyframes(pullRight) {
 }
 /* ---- 纯扁平,与 preloader 进度条 → 按钮变形动画同款观感:
    轨道纯色 --bg-2 无描边,圆点纯色 --accent(变形假层用的就是这两个值,
-   main.js morphBarToToggle 收尾按这里的计算背景同步,假层/真按钮零色差) ---- */
+   main.ts morphBarToToggle 收尾按这里的计算背景同步,假层/真按钮零色差) ---- */
 .track {
   position: relative;
   width: 64px;

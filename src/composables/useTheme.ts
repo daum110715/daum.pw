@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import type { Ref } from 'vue'
 import { themeScrollLock } from '@/composables/brandDock'
 
 const STORAGE_KEY = 'daum-theme'
@@ -6,20 +7,22 @@ const TRANSITION_DURATION = 450
 /* 覆盖 snap delay(0.12)+duration max(0.45) 与换肤回流窗口 */
 const SCROLL_LOCK_MS = 600
 
-// 全局共享主题状态(模块单例)
-const theme = ref('light')
+export type ThemeName = 'light' | 'dark'
 
-function apply(t) {
+// 全局共享主题状态(模块单例)
+const theme: Ref<ThemeName> = ref('light')
+
+function apply(t: ThemeName) {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', t)
   }
 }
 
 let unlockTimer = 0
-let activePin = null
+let activePin: (() => void) | null = null
 
 /** 换肤前后钉住 scrollY、暂停 pin snap,避免 color-scheme/滚动条回流把飞行进度拽飞 */
-function withScrollPinned(run) {
+function withScrollPinned(run: () => void) {
   if (typeof window === 'undefined') {
     run()
     return
@@ -64,7 +67,7 @@ function withScrollPinned(run) {
 
 // 初始化:localStorage > 系统偏好 > light(与 index.html 内联脚本逻辑一致,防闪烁)
 {
-  let t = 'light'
+  let t: ThemeName = 'light'
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved === 'light' || saved === 'dark') t = saved
@@ -106,7 +109,7 @@ export function useTheme() {
     })
   }
 
-  function set(t) {
+  function set(t: ThemeName) {
     withScrollPinned(() => {
       theme.value = t
     })

@@ -19,13 +19,14 @@
   </nav>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount } from 'vue'
+import type { CSSProperties } from 'vue'
 import { dockGeo, flyP, flyEase, activePage, bootDone } from '@/composables/brandDock'
 
 const total = 9
 const NEW_DIGITS = [3, 4, 7, 8]
-const isNew = (n) => NEW_DIGITS.includes(n)
+const isNew = (n: number) => NEW_DIGITS.includes(n)
 
 /* 展开度 = flyEase(Hero 的独立展开/收回补间,到位 back.out 弹开):
    与 SVG 数字摊开同一驱动——槽宽撑开、3/4/7/8 补入,
@@ -35,23 +36,23 @@ const ease = flyEase
 /* 新数字入场:严格从左到右 3→4→7→8 依次滑入+淡入——
    每个数字延迟起步、各自走完剩余行程,0.45 槽宽短距滑正,
    不与邻居字形交叠 */
-const NEW_DELAY = { 3: 0, 4: 0.12, 7: 0.24, 8: 0.36 }
-function localT(n) {
+const NEW_DELAY: Record<number, number> = { 3: 0, 4: 0.12, 7: 0.24, 8: 0.36 }
+function localT(n: number) {
   const d = NEW_DELAY[n] || 0
   return Math.min(1, Math.max(0, (ease.value - d) / (1 - d)))
 }
 
-function slide(n) {
+function slide(n: number) {
   const slotW = dockGeo.advance + dockGeo.gap * ease.value
   return -(1 - localT(n)) * slotW * 0.45
 }
 
 /* 透明度:localT 前 45% 淡入,与滑入同步完成 */
-function newO(n) {
+function newO(n: number) {
   return Math.min(1, localT(n) / 0.45)
 }
 
-const pillStyle = computed(() => {
+const pillStyle = computed((): CSSProperties => {
   if (!dockGeo.ready) return { opacity: 0 }
   const slotW = dockGeo.advance + dockGeo.gap * ease.value
   const w = dockGeo.spacer + 5 * slotW + 4 * slotW * ease.value + 8
@@ -70,8 +71,8 @@ const pillStyle = computed(() => {
   }
 })
 
-let observer = null
-let sections = []
+let observer: IntersectionObserver | null = null
+let sections: Element[] = []
 
 onMounted(() => {
   sections = Array.from(document.querySelectorAll('main > section'))
@@ -84,12 +85,12 @@ onMounted(() => {
     },
     { threshold: 0.5 },
   )
-  sections.forEach((s) => observer.observe(s))
+  sections.forEach((s) => observer!.observe(s))
 })
 
 onBeforeUnmount(() => observer && observer.disconnect())
 
-function go(n) {
+function go(n: number) {
   const el = sections[n - 1]
   if (!el) return
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches

@@ -230,7 +230,7 @@ h4 {
   opacity: 1;
   transform: none;
 }
-/* 开屏衔接后再点亮的模块(由 main.js 级联加 .is-visible) */
+/* 开屏衔接后再点亮的模块(由 main.ts 级联加 .is-visible) */
 .reveal-after-boot:not(.is-visible) {
   opacity: 0;
   transform: translateY(22px);

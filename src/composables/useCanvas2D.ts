@@ -1,4 +1,31 @@
 import { onMounted, onBeforeUnmount } from 'vue'
+import type { Ref } from 'vue'
+
+/** draw 回调入参:t 为启动以来秒数(暂停不计),frame 为帧序号 */
+export interface Canvas2DFrame {
+  ctx: CanvasRenderingContext2D
+  w: number
+  h: number
+  t: number
+  dt: number
+  frame: number
+}
+
+export interface Canvas2DOptions {
+  /** DPR 上限:高分屏全 dpr 会让填充率爆炸,2 足够锐利 */
+  maxDpr?: number
+  /** fps 上限节流(默认 60,低端机可降 30) */
+  fps?: number
+  /** 滚出视口自动暂停(默认开) */
+  pauseOffscreen?: boolean
+}
+
+export interface Canvas2DControl {
+  start(): void
+  stop(): void
+  resize(): void
+  readonly running: boolean
+}
 
 /**
  * Canvas 2D 程序化动画基座:任何复杂 2D 动画(粒子/流场/物理/分形)
@@ -12,22 +39,26 @@ import { onMounted, onBeforeUnmount } from 'vue'
  * 卸载时全部清理,无泄漏。
  *
  * 用法:
- *   const canvasRef = ref(null)
+ *   const canvasRef = ref<HTMLCanvasElement | null>(null)
  *   useCanvas2D(canvasRef, ({ ctx, w, h, t, dt }) => { ... })
  *
  * 返回 { start, stop, resize, running } 供需要手动控制的场景(如滚到才播)。
  */
-export function useCanvas2D(canvasRef, draw, options = {}) {
+export function useCanvas2D(
+  canvasRef: Ref<HTMLCanvasElement | null>,
+  draw: (f: Canvas2DFrame) => void,
+  options: Canvas2DOptions = {},
+): Canvas2DControl {
   const {
-    maxDpr = 2, // DPR 上限:高分屏全 dpr 会让填充率爆炸,2 足够锐利
+    maxDpr = 2,
     fps = 60,
     pauseOffscreen = true,
   } = options
 
-  let ctx = null
+  let ctx: CanvasRenderingContext2D | null = null
   let rafId = 0
-  let resizeObserver = null
-  let io = null
+  let resizeObserver: ResizeObserver | null = null
+  let io: IntersectionObserver | null = null
   let startTime = 0 // 累计已播时长对应的 performance 基准
   let accPaused = 0 // 暂停累计时长,t = (now - startTime - accPaused)/1000
   let pauseStamp = 0
@@ -59,8 +90,8 @@ export function useCanvas2D(canvasRef, draw, options = {}) {
     h = rect.height
   }
 
-  function tick(now) {
-    if (!running) return
+  function tick(now: number) {
+    if (!running || !ctx) return
     rafId = requestAnimationFrame(tick)
     /* fps 节流:未到间隔的帧直接跳过,rAF 链不断 */
     if (now - lastFrame < frameInterval - 0.5) return
@@ -101,7 +132,9 @@ export function useCanvas2D(canvasRef, draw, options = {}) {
   onMounted(() => {
     const canvas = canvasRef.value
     if (!canvas) return
-    ctx = canvas.getContext('2d')
+    const c2d = canvas.getContext('2d')
+    if (!c2d) return
+    ctx = c2d
     reducedMotion =
       window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -123,7 +156,7 @@ export function useCanvas2D(canvasRef, draw, options = {}) {
 
     if (reducedMotion) {
       /* 静态一帧:t=0 的画面,给动画作者一个收敛的初态 */
-      draw({ ctx, w, h, t: 0, dt: 0, frame: 0 })
+      draw({ ctx: c2d, w, h, t: 0, dt: 0, frame: 0 })
     } else {
       startTime = performance.now()
       start()

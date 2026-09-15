@@ -13,12 +13,12 @@
 
 ## 硬性规则
 
-- **炸弹文件最小触碰**：`HeroSection.vue`（~1200 行）、`main.js`（~940 行）已超 800 行红线——只改需求直接相关的行，不顺手重构；新功能一律新建文件或抽 `composables/`，详见 CONTRIBUTING.md「文件体量红线 · 炸弹文件外科原则」
+- **动效编排是高危区**：原炸弹文件已按关注点拆分——`main.ts` 仅入口，开屏编排在 `src/boot/`（handoff/scrollLock/toggleMorph/veilSplit 等），Hero 停靠编排在 `composables/useHeroDock.ts` / `useSocialDock.ts`（仍处 400–800 警戒线）。只改需求直接相关的行；时序/几何里的根因注释必须保留，防回退成旧方案，详见 CONTRIBUTING.md「文件体量红线」
 - 颜色只用 `var(--token)`，深浅双主题同步定义；禁止写死色值、禁止 html 内联钉主题色
 - 动效只动合成属性（transform/WAAPI 几何插值），禁止逐帧 layout 属性
 - WAAPI `fill:'forwards'` 收尾必须钉终态 + `cancel()`，DOM 交还纯净
 - 异步时序必须带兜底（transitionend + timeout 双通道，`finished.catch(() => {})`）
-- 修改品牌字形必须同步 `src/data/brandGlyph.js` 与 `index.html` 内联 SVG
+- 修改品牌字形必须同步 `src/data/brandGlyph.ts` 与 `index.html` 内联 SVG
 
 ## 验证
 

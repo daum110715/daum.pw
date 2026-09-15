@@ -29,13 +29,13 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { BRAND_TEXT, BRAND_VIEWBOX, BRAND_GROUP_TRANSFORM, BRAND_PATHS } from '@/data/brandGlyph'
 import { initBeamGrow } from '@/composables/useBeamGrow'
 
-const cardEl = ref(null)
-let destroy = null
+const cardEl = ref<HTMLElement | null>(null)
+let destroy: (() => void) | null = null
 
 onMounted(() => {
   const sectionEl = document.getElementById('page-2')
